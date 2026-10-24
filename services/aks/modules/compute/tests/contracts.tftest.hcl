@@ -79,7 +79,8 @@ override_data {
 # Azure returns this computed identity after cluster creation. Supply its shape
 # explicitly for offline mock plans used by the AcrPull role assignment.
 override_resource {
-  target = azurerm_kubernetes_cluster.main
+  override_during = plan
+  target          = azurerm_kubernetes_cluster.main
   values = {
     kubelet_identity = [{
       client_id                 = "00000000-0000-0000-0000-000000000004"
