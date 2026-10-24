@@ -78,6 +78,9 @@ stages:
         arguments: -Service ${{ parameters.service }} -Environment ${{ parameters.environment }} -Operation plan -ArtifactDirectory "$(Build.ArtifactStagingDirectory)/approved-plan"
         visibleAzLogin: false
       env:
+        SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+        SYSTEM_OIDCREQUESTURI: $(System.OidcRequestUri)
+        ARM_ADO_PIPELINE_SERVICE_CONNECTION_ID: $(AZURE_SERVICE_CONNECTION_ID)
         STATE_RESOURCE_GROUP: $(STATE_RESOURCE_GROUP)
         STATE_STORAGE_ACCOUNT: $(STATE_STORAGE_ACCOUNT)
         STATE_CONTAINER: $(STATE_CONTAINER)
@@ -125,6 +128,9 @@ stages:
               arguments: -Service ${{ parameters.service }} -Environment ${{ parameters.environment }} -Operation apply -ArtifactDirectory "$(Pipeline.Workspace)/approved-plan"
               visibleAzLogin: false
             env:
+              SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+              SYSTEM_OIDCREQUESTURI: $(System.OidcRequestUri)
+              ARM_ADO_PIPELINE_SERVICE_CONNECTION_ID: $(AZURE_SERVICE_CONNECTION_ID)
               STATE_RESOURCE_GROUP: $(STATE_RESOURCE_GROUP)
               STATE_STORAGE_ACCOUNT: $(STATE_STORAGE_ACCOUNT)
               STATE_CONTAINER: $(STATE_CONTAINER)

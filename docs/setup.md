@@ -41,6 +41,7 @@ Create one variable group per service/environment, named `compute-<service>-<env
 
 | Variable | Value |
 | :--- | :--- |
+| AZURE_SERVICE_CONNECTION_ID | Azure DevOps service connection GUID (not its display name); must identify the selected connection |
 | STATE_RESOURCE_GROUP | Existing backend RG |
 | STATE_STORAGE_ACCOUNT | Existing account name |
 | STATE_CONTAINER | Existing private container, usually tfstate |
@@ -49,6 +50,10 @@ Create one variable group per service/environment, named `compute-<service>-<env
 For services without required secrets, set TF_SECRET_JSON to `{}`. For Virtual Machines, Virtual Desktop and Service Fabric, set it as a **secret variable** containing `{"admin_password":"<actual complex secret>"}`. Never commit the real value. Secret names are checked against the selected service contract, then mapped to process-only TF_VAR values. Azure DevOps JSON secret masking is not a guarantee that every substring will be redacted; never print the object or individual values.
 
 Edit that service's committed public tfvars with actual subscription and configuration. The live checker rejects the example subscription, documentation CIDRs, example SSH key and example certificate/group values. Use a dedicated reviewed branch. Do not point a fresh root at existing resources/state without inventory and import analysis.
+
+Terraform uses the job-scoped `System.AccessToken`, `System.OidcRequestUri` and the service connection GUID to request fresh federated assertions. This supports token refresh during long operations instead of reusing AzureCLI's initial `idToken`. Keep the connection authorized for this pipeline, limit job authorization scope and never print these environment values. A fresh assertion is limited to the running job; it is not a stored client secret. Token refresh still needs a live acceptance check in your Azure DevOps organization.
+
+The configuration follows the pinned [AzureRM 4.68 OIDC guide](https://github.com/hashicorp/terraform-provider-azurerm/blob/v4.68.0/website/docs/guides/service_principal_oidc.html.markdown) and [Terraform 1.13 backend implementation](https://github.com/hashicorp/terraform/blob/v1.13.0/internal/backend/remote-state/azure/backend.go).
 
 ## 5. Approval environments and serialization
 

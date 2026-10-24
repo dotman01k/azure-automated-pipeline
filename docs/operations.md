@@ -20,7 +20,7 @@ A blob lease belongs to an active Terraform operation. Do not automatically brea
 | :--- | :--- |
 | Job queued | Windows pool name, Agent.OS demand, agent online and pipeline permission |
 | Missing pwsh/python/az | Agent service account PATH and service restart after installation |
-| Missing WIF idToken | Federated ARM service connection and addSpnToEnvironment |
+| Missing WIF settings or assertion refresh denied | Check the federated ARM connection, its GUID in AZURE_SERVICE_CONNECTION_ID, pipeline authorization and job token/URI mappings |
 | Missing secret contract | Correct compute-service-environment variable group; `{}` for a service with no secrets |
 | Invalid subscription/example input | Selected folder's tfvars and service connection must agree |
 | Blob 403 | Data role, scope, storage networking and propagation |

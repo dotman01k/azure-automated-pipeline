@@ -31,3 +31,14 @@ class PipelineContracts(unittest.TestCase):
   task=json.loads((ROOT/'services/batch/app/task.json').read_text())
   self.assertEqual(task['constraints']['maxWallClockTime'],'PT5M')
   self.assertEqual(task['constraints']['maxTaskRetryCount'],1)
+
+ def test_refreshable_oidc_for_plan_and_apply(self):
+  p=yaml.safe_load((ROOT/'pipelines/compute.yml').read_text())
+  plan=p['stages'][1]['jobs'][0]['steps']
+  apply=p['stages'][2]['jobs'][0]['strategy']['runOnce']['deploy']['steps']
+  for steps in (plan,apply):
+   task=next(x for x in steps if x.get('task')=='AzureCLI@2')
+   self.assertEqual(task['env']['SYSTEM_ACCESSTOKEN'],'$(System.AccessToken)')
+   self.assertEqual(task['env']['SYSTEM_OIDCREQUESTURI'],'$(System.OidcRequestUri)')
+   self.assertEqual(task['env']['ARM_ADO_PIPELINE_SERVICE_CONNECTION_ID'],'$(AZURE_SERVICE_CONNECTION_ID)')
+   self.assertTrue(task['inputs']['addSpnToEnvironment'])

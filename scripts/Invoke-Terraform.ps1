@@ -24,7 +24,7 @@ if ($Operation -eq 'validate') {
     Invoke-Checked python @((Join-Path $PSScriptRoot 'validate_inputs.py'),'terraform.tfvars.json')
     return
 }
-foreach ($name in 'servicePrincipalId','tenantId','idToken','STATE_RESOURCE_GROUP','STATE_STORAGE_ACCOUNT','STATE_CONTAINER','TF_SECRET_JSON') {
+foreach ($name in 'servicePrincipalId','tenantId','SYSTEM_ACCESSTOKEN','SYSTEM_OIDCREQUESTURI','ARM_ADO_PIPELINE_SERVICE_CONNECTION_ID','STATE_RESOURCE_GROUP','STATE_STORAGE_ACCOUNT','STATE_CONTAINER','TF_SECRET_JSON') {
     $value = [Environment]::GetEnvironmentVariable($name)
     if ([string]::IsNullOrWhiteSpace($value) -or $value.StartsWith('$(')) { throw "Missing pipeline setting: $name" }
 }
@@ -32,7 +32,12 @@ $env:ARM_USE_OIDC = 'true'
 $env:ARM_USE_AZUREAD = 'true'
 $env:ARM_CLIENT_ID = $env:servicePrincipalId
 $env:ARM_TENANT_ID = $env:tenantId
-$env:ARM_OIDC_TOKEN = $env:idToken
+# Let the pinned provider AND backend request fresh job-scoped assertions.
+# A one-time AzureCLI idToken can expire during long Service Fabric operations.
+Remove-Item Env:ARM_OIDC_TOKEN -ErrorAction SilentlyContinue
+Remove-Item Env:ARM_OIDC_TOKEN_FILE_PATH -ErrorAction SilentlyContinue
+$env:ARM_OIDC_REQUEST_TOKEN = $env:SYSTEM_ACCESSTOKEN
+$env:ARM_OIDC_REQUEST_URL = $env:SYSTEM_OIDCREQUESTURI
 $secrets = ConvertFrom-Json -InputObject $env:TF_SECRET_JSON -AsHashtable
 if ($secrets -isnot [System.Collections.IDictionary]) { throw 'TF_SECRET_JSON must be a JSON object.' }
 $expectedSecrets = @($project.secret_variables)
