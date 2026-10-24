@@ -51,6 +51,8 @@ flowchart TD
 
 The normal pipeline rejects deletions, replacements, forget actions and incomplete/deferred plans. It permits reviewed creates and in-place updates. A no-destruction gate is not a no-change guarantee. Apply verifies the selected service, environment, build, commit, backend and saved plan hash. External Azure DevOps approvals, branch controls and exclusive locks must be configured by a resource administrator; YAML does not create them automatically.
 
+All Terraform data sources live in a separate `data.tf` within the module or environment that uses them. `main.tf` holds managed resources, module calls and outputs. Modules with no data sources do not need an empty data file.
+
 ### Paths and boundaries
 
 | Path | Responsibility |

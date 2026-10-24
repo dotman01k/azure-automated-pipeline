@@ -161,9 +161,7 @@ resource "azurerm_kubernetes_cluster" "main" {
 
 }
 
-data "azurerm_client_config" "current" {
 
-}
 
 resource "azurerm_kubernetes_cluster_node_pool" "apps" {
 
@@ -191,4 +189,3 @@ output "contract" {
   }
 
 }
-

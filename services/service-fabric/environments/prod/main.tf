@@ -1,7 +1,3 @@
-data "azurerm_resource_group" "platform" {
-  name = var.resource_group_name
-}
-
 module "compute" {
 
   source                        = "../../modules/compute"
@@ -24,4 +20,3 @@ module "compute" {
 output "contract" {
   value = module.compute.contract
 }
-
