@@ -1,0 +1,15 @@
+{
+  "service": "aks",
+  "title": "Azure Kubernetes Service",
+  "secret_variables": [],
+  "providers": [
+    "Microsoft.ContainerService",
+    "Microsoft.ContainerRegistry",
+    "Microsoft.Network",
+    "Microsoft.ManagedIdentity"
+  ],
+  "network": true,
+  "role_assignment": true,
+  "cost": "Three VM nodes, managed disks, NAT Gateway, egress IP and Basic ACR storage/tier.",
+  "boundary": "This is a smaller reusable infrastructure reference, not a duplicate of the separate fully exercised azure-aks-platform project. It has a public allowlisted API, two system nodes and one app node. No private Key Vault, CI application identity or ingress is created. The sample manifest is deployed separately by an authorized Entra operator."
+}

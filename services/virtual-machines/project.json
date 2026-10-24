@@ -1,0 +1,17 @@
+{
+  "service": "virtual-machines",
+  "title": "Virtual Machines",
+  "secret_variables": [
+    "admin_password"
+  ],
+  "providers": [
+    "Microsoft.Compute",
+    "Microsoft.Network",
+    "Microsoft.ManagedIdentity"
+  ],
+  "network": true,
+  "role_assignment": false,
+  "state_key_style": "legacy-windows-vm",
+  "cost": "Windows VM, disk, Basic Bastion, Standard public IP and backend storage.",
+  "boundary": "The existing reconstructed Windows Server module, moved without changing its module.windows_vm resource addresses. It is not an export of the original InfraProject repository."
+}

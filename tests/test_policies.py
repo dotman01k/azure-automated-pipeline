@@ -5,9 +5,9 @@ def module(name):
  spec=importlib.util.spec_from_file_location(name,ROOT/'scripts'/f'{name}.py');m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);return m
 policy=module('plan_policy');inputs=module('validate_inputs')
 class InputTests(unittest.TestCase):
- def setUp(self):self.v=json.loads((ROOT/'environments/dev/terraform.tfvars.json').read_text())
+ def setUp(self):self.v=json.loads((ROOT/'services/virtual-machines/environments/dev/terraform.tfvars.json').read_text())
  def test_dev(self):inputs.validate(self.v)
- def test_prod(self):inputs.validate(json.loads((ROOT/'environments/prod/terraform.tfvars.json').read_text()))
+ def test_prod(self):inputs.validate(json.loads((ROOT/'services/virtual-machines/environments/prod/terraform.tfvars.json').read_text()))
  def test_overlap(self):
   self.v['bastion_cidr']=self.v['workload_cidr']
   with self.assertRaises(ValueError):inputs.validate(self.v)

@@ -1,0 +1,8 @@
+{
+  "id": "hello",
+  "commandLine": "/bin/bash -c 'printf hello-from-batch; uname -s'",
+  "constraints": {
+    "maxTaskRetryCount": 1,
+    "maxWallClockTime": "PT5M"
+  }
+}

@@ -1,0 +1,6 @@
+resource_group_name="rg-compute-state"
+storage_account_name="REPLACE_WITH_UNIQUE_ACCOUNT"
+container_name="tfstate"
+key="compute/container-apps/dev.tfstate"
+use_azuread_auth=true
+use_oidc=true

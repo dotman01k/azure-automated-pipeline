@@ -1,0 +1,14 @@
+{
+  "service": "functions",
+  "title": "Azure Functions",
+  "secret_variables": [],
+  "providers": [
+    "Microsoft.Web",
+    "Microsoft.Storage",
+    "Microsoft.ManagedIdentity"
+  ],
+  "network": false,
+  "role_assignment": true,
+  "cost": "Flex execution, memory and request consumption plus storage/transactions. No always ready instance is configured.",
+  "boundary": "Flex Consumption availability, regional memory quota, supported runtime and deployment storage permissions need live checks. The function code must be published separately. Its HTTP trigger requires a function key in addition to CIDR access; production application authentication is a separate design."
+}

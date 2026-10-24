@@ -1,4 +1,4 @@
-name: Validate reconstructed pipeline
+name: Validate compute collection
 on:
   push:
   pull_request:
@@ -9,6 +9,13 @@ jobs:
   validate:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        service: ["aks", "app-service", "batch", "container-apps", "container-instances", "functions", "service-fabric", "virtual-desktop", "virtual-machines", "vm-scale-sets"]
+    env:
+      SERVICE: ${{ matrix.service }}
     steps:
     - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       with:
@@ -17,16 +24,21 @@ jobs:
       with:
         terraform_version: 1.13.0
         terraform_wrapper: false
+    - run: python -m pip install -r requirements-validation.txt
     - run: python -m unittest discover -s tests -v
     - run: pwsh -NoProfile -File tests/Test-Syntax.ps1
-    - run: |
+    - name: Validate service module and roots
+      run: |
+        set -euo pipefail
         terraform fmt -check -recursive
-        for root in modules/windows-vm environments/dev environments/prod; do
+        export TF_PLUGIN_CACHE_DIR="$RUNNER_TEMP/provider-cache"
+        mkdir -p "$TF_PLUGIN_CACHE_DIR"
+        for root in services/"$SERVICE"/modules/* services/"$SERVICE"/environments/dev services/"$SERVICE"/environments/prod; do
           terraform -chdir="$root" init -backend=false -input=false -lockfile=readonly
           terraform -chdir="$root" validate -no-color
+          if [[ -d "$root/tests" ]]; then terraform -chdir="$root" test -no-color; fi
         done
-        terraform -chdir=modules/windows-vm test -no-color
-    - name: Exercise PowerShell validation entry point
+    - name: Exercise PowerShell entry point
       run: |
-        pwsh -NoProfile -File scripts/Invoke-Terraform.ps1 -Environment dev -Operation validate
-        pwsh -NoProfile -File scripts/Invoke-Terraform.ps1 -Environment prod -Operation validate
+        pwsh -NoProfile -File scripts/Invoke-Terraform.ps1 -Service "$SERVICE" -Environment dev -Operation validate
+        pwsh -NoProfile -File scripts/Invoke-Terraform.ps1 -Service "$SERVICE" -Environment prod -Operation validate

@@ -1,0 +1,17 @@
+{
+  "service": "virtual-desktop",
+  "title": "Azure Virtual Desktop",
+  "secret_variables": [
+    "admin_password"
+  ],
+  "providers": [
+    "Microsoft.DesktopVirtualization",
+    "Microsoft.Compute",
+    "Microsoft.Network",
+    "Microsoft.ManagedIdentity"
+  ],
+  "network": true,
+  "role_assignment": true,
+  "cost": "Windows 11 session host VM, disk, NAT and outbound IP. Eligible AVD user licensing must be established separately.",
+  "boundary": "Creates the control plane and one Entra join prepared host. Registration is a separate explicit step with a fresh short lived host pool token and Microsoft agent installers. A VM template is not treated as host registration. Tenant SSO/MFA/client prerequisites, licensing and actual desktop login need live acceptance; FSLogix and profile storage are not included."
+}

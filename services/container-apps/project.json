@@ -1,0 +1,14 @@
+{
+  "service": "container-apps",
+  "title": "Azure Container Apps",
+  "secret_variables": [],
+  "providers": [
+    "Microsoft.App",
+    "Microsoft.OperationalInsights",
+    "Microsoft.Network"
+  ],
+  "network": true,
+  "role_assignment": false,
+  "cost": "Consumption replicas, environment networking/load balancer behavior, log ingestion and private DNS. Scale to zero does not guarantee a zero bill.",
+  "boundary": "App ingress is external to the app within an internally networked environment, not exposed to the internet. Reach it from a privately connected client with DNS access. The demo image uses a floating tag; pin an approved digest for releases. No private registry permissions are created."
+}

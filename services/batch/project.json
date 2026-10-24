@@ -1,0 +1,13 @@
+{
+  "service": "batch",
+  "title": "Azure Batch",
+  "secret_variables": [],
+  "providers": [
+    "Microsoft.Batch",
+    "Microsoft.Network"
+  ],
+  "network": true,
+  "role_assignment": false,
+  "cost": "Pool starts at zero worker nodes, but NAT and outbound public IP still cost money. Increasing node_count creates billable workers.",
+  "boundary": "Batch pool/image quotas are separate from ordinary VM quotas. Validate supported image/agent pairs before allocating workers. Account job APIs are CIDR restricted; node management remains public and authenticated for simplified communication. No private endpoint is claimed."
+}

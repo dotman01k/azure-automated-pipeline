@@ -1,0 +1,12 @@
+{
+  "service": "app-service",
+  "title": "App Service",
+  "secret_variables": [],
+  "providers": [
+    "Microsoft.Web"
+  ],
+  "network": false,
+  "role_assignment": false,
+  "cost": "Dedicated Linux App Service plan remains billable when the app is stopped.",
+  "boundary": "The platform and application package are separate operations. The public endpoint is restricted to explicit CIDRs, including SCM. Add the release agent outbound CIDR before publishing; no private endpoint or custom domain is created."
+}

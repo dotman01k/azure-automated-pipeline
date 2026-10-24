@@ -1,0 +1,16 @@
+{
+  "service": "service-fabric",
+  "title": "Service Fabric Managed Clusters",
+  "secret_variables": [
+    "admin_password"
+  ],
+  "providers": [
+    "Microsoft.ServiceFabric",
+    "Microsoft.Compute",
+    "Microsoft.Network"
+  ],
+  "network": false,
+  "role_assignment": false,
+  "cost": "At least three Windows nodes for Basic, five for Standard, managed disks and managed networking/load balancer resources.",
+  "boundary": "Uses a pre-existing administrator client certificate thumbprint; the private certificate stays with the operator. Azure manages the cluster certificate and underlying resources. An application TLS load balancer mapping is defined, but an application, certificate binding and listener must be deployed separately before it serves traffic. Service Fabric Explorer/client authentication and management endpoints need a live security review; no private management endpoint is claimed."
+}

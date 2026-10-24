@@ -1,0 +1,13 @@
+{
+  "service": "container-instances",
+  "title": "Azure Container Instances",
+  "secret_variables": [],
+  "providers": [
+    "Microsoft.ContainerInstance",
+    "Microsoft.Network"
+  ],
+  "network": true,
+  "role_assignment": false,
+  "cost": "Allocated container CPU/memory while running, NAT Gateway and its Standard public IP.",
+  "boundary": "The web container uses private HTTP for a lab. It is not an internet TLS service or an autoscaling platform. Private access or an approved reverse proxy is required. The image tag is a demonstration default and must be pinned for controlled releases."
+}

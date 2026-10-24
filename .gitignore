@@ -3,7 +3,7 @@
 *.tfplan
 *.tfvars
 *.tfvars.json
-!environments/*/terraform.tfvars.json
+!services/*/environments/*/terraform.tfvars.json
 *.backend.hcl
 .plan/
 __pycache__/

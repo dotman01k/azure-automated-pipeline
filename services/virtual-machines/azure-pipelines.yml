@@ -1,0 +1,25 @@
+trigger: none
+pr: none
+parameters:
+- name: environment
+  type: string
+  default: dev
+  values: [dev, prod]
+- name: operation
+  type: string
+  default: plan
+  values: [plan, apply]
+- name: agentPool
+  type: string
+  default: InfraProject
+- name: serviceConnection
+  type: string
+  default: sc-compute-dev
+extends:
+  template: ../../pipelines/compute.yml
+  parameters:
+    service: virtual-machines
+    environment: ${{ parameters.environment }}
+    operation: ${{ parameters.operation }}
+    agentPool: ${{ parameters.agentPool }}
+    serviceConnection: ${{ parameters.serviceConnection }}

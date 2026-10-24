@@ -1,7 +1,10 @@
-# Azure DevOps executes this pipeline; GitHub Actions only validates the source.
 trigger: none
 pr: none
 parameters:
+- name: service
+  type: string
+  default: virtual-machines
+  values: [aks, app-service, batch, container-apps, container-instances, functions, service-fabric, virtual-desktop, virtual-machines, vm-scale-sets]
 - name: environment
   type: string
   default: dev
@@ -15,115 +18,12 @@ parameters:
   default: InfraProject
 - name: serviceConnection
   type: string
-  default: sc-platform-dev
-variables:
-- group: windows-vm-${{ parameters.environment }}
-stages:
-- stage: Validate
-  jobs:
-  - job: ValidateSource
-    pool:
-      name: ${{ parameters.agentPool }}
-      demands: Agent.OS -equals Windows_NT
-    workspace:
-      clean: all
-    steps:
-    - checkout: self
-      clean: true
-      persistCredentials: false
-    - task: PowerShell@2
-      inputs:
-        pwsh: true
-        filePath: scripts/Install-Terraform.ps1
-    - task: PowerShell@2
-      inputs:
-        pwsh: true
-        filePath: scripts/Invoke-Terraform.ps1
-        arguments: -Environment ${{ parameters.environment }} -Operation validate
-      env:
-        TF_VAR_admin_password: $(VM_ADMIN_PASSWORD)
-    - task: PowerShell@2
-      inputs:
-        pwsh: true
-        targetType: inline
-        script: |
-          python -m unittest discover -s tests -v
-          if ($LASTEXITCODE) { throw 'Policy tests failed.' }
-- stage: Plan
-  dependsOn: Validate
-  jobs:
-  - job: CreatePlan
-    pool:
-      name: ${{ parameters.agentPool }}
-      demands: Agent.OS -equals Windows_NT
-    workspace:
-      clean: all
-    steps:
-    - checkout: self
-      clean: true
-      persistCredentials: false
-    - task: PowerShell@2
-      inputs:
-        pwsh: true
-        filePath: scripts/Install-Terraform.ps1
-    - task: AzureCLI@2
-      inputs:
-        azureSubscription: ${{ parameters.serviceConnection }}
-        addSpnToEnvironment: true
-        scriptType: pscore
-        scriptLocation: scriptPath
-        scriptPath: scripts/Invoke-Terraform.ps1
-        arguments: -Environment ${{ parameters.environment }} -Operation plan -ArtifactDirectory "$(Build.ArtifactStagingDirectory)/approved-plan"
-        visibleAzLogin: false
-      env:
-        STATE_RESOURCE_GROUP: $(STATE_RESOURCE_GROUP)
-        STATE_STORAGE_ACCOUNT: $(STATE_STORAGE_ACCOUNT)
-        STATE_CONTAINER: $(STATE_CONTAINER)
-        VM_ADMIN_PASSWORD: $(VM_ADMIN_PASSWORD)
-    - task: PublishPipelineArtifact@1
-      inputs:
-        targetPath: $(Build.ArtifactStagingDirectory)/approved-plan
-        artifact: approved-plan
-- stage: Apply
-  dependsOn: Plan
-  condition: and(succeeded(), eq('${{ parameters.operation }}', 'apply'), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
-  lockBehavior: sequential
-  jobs:
-  - deployment: ApplyApprovedPlan
-    environment: windows-vm-${{ parameters.environment }}
-    pool:
-      name: ${{ parameters.agentPool }}
-      demands: Agent.OS -equals Windows_NT
-    workspace:
-      clean: all
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - checkout: self
-            clean: true
-            persistCredentials: false
-          - download: none
-          - task: DownloadPipelineArtifact@2
-            inputs:
-              buildType: current
-              artifactName: approved-plan
-              targetPath: $(Pipeline.Workspace)/approved-plan
-          - task: PowerShell@2
-            inputs:
-              pwsh: true
-              filePath: scripts/Install-Terraform.ps1
-          - task: AzureCLI@2
-            inputs:
-              azureSubscription: ${{ parameters.serviceConnection }}
-              addSpnToEnvironment: true
-              scriptType: pscore
-              scriptLocation: scriptPath
-              scriptPath: scripts/Invoke-Terraform.ps1
-              arguments: -Environment ${{ parameters.environment }} -Operation apply -ArtifactDirectory "$(Pipeline.Workspace)/approved-plan"
-              visibleAzLogin: false
-            env:
-              STATE_RESOURCE_GROUP: $(STATE_RESOURCE_GROUP)
-              STATE_STORAGE_ACCOUNT: $(STATE_STORAGE_ACCOUNT)
-              STATE_CONTAINER: $(STATE_CONTAINER)
-              VM_ADMIN_PASSWORD: $(VM_ADMIN_PASSWORD)
+  default: sc-compute-dev
+extends:
+  template: pipelines/compute.yml
+  parameters:
+    service: ${{ parameters.service }}
+    environment: ${{ parameters.environment }}
+    operation: ${{ parameters.operation }}
+    agentPool: ${{ parameters.agentPool }}
+    serviceConnection: ${{ parameters.serviceConnection }}

@@ -1,0 +1,14 @@
+{
+  "service": "vm-scale-sets",
+  "title": "Virtual Machine Scale Sets",
+  "secret_variables": [],
+  "providers": [
+    "Microsoft.Compute",
+    "Microsoft.Network",
+    "Microsoft.Insights"
+  ],
+  "network": true,
+  "role_assignment": false,
+  "cost": "Two to four Linux nodes, disks, internal load balancer, NAT Gateway and a Standard outbound IP.",
+  "boundary": "Uniform orchestration is explicit here. Manual upgrades are deliberate; use a separately reviewed image rollout. Flexible orchestration may be preferable for other workloads. Private management connectivity is a prerequisite; no SSH public IP or Bastion is created."
+}
