@@ -43,7 +43,7 @@ Default node_count is zero. After an approved update to at least one node, confi
 
 ## Security boundary and limitations
 
-Batch pool/image quotas are separate from ordinary VM quotas. Validate supported image/agent pairs before allocating workers. Account job APIs are CIDR restricted; node management remains public and authenticated for simplified communication. No private endpoint is claimed.
+Batch pool/image quotas are separate from ordinary VM quotas. Validate supported image/agent pairs before allocating workers. Single /32 client entries are sent as bare host addresses for the pinned provider; /31 prefixes are rejected rather than widened. Account job APIs are CIDR restricted; node management remains public and authenticated for simplified communication. No private endpoint is claimed.
 
 The default sample image/version, where applicable, is a starting point rather than a supply chain attestation. Pin an approved version/digest and validate regional service support before a live release. Do not infer production availability from a single reference deployment or source test.
 

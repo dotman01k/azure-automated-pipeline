@@ -24,12 +24,13 @@ resource "azurerm_linux_web_app" "main" {
 
   site_config {
 
-    always_on               = true
-    minimum_tls_version     = "1.2"
-    scm_minimum_tls_version = "1.2"
-    ftps_state              = "Disabled"
-    health_check_path       = "/healthz"
-    app_command_line        = "gunicorn --bind 0.0.0.0:8000 app:application"
+    always_on                         = true
+    minimum_tls_version               = "1.2"
+    scm_minimum_tls_version           = "1.2"
+    ftps_state                        = "Disabled"
+    health_check_path                 = "/healthz"
+    health_check_eviction_time_in_min = 2
+    app_command_line                  = "gunicorn --bind 0.0.0.0:8000 app:application"
     application_stack {
       python_version = "3.12"
     }

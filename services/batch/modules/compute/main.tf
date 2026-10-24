@@ -70,7 +70,7 @@ resource "azurerm_batch_account" "main" {
 
         for_each = toset(var.allowed_cidrs)
         content {
-          ip_range = ip_rule.value
+          ip_range = trimsuffix(ip_rule.value, "/32")
           action   = "Allow"
         }
 

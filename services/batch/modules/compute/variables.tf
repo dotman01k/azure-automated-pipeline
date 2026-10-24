@@ -52,6 +52,10 @@ variable "node_count" {
 }
 
 variable "allowed_cidrs" {
+  validation {
+    condition     = alltrue([for c in var.allowed_cidrs : !endswith(c, "/31")])
+    error_message = "The pinned Batch API/provider accepts single hosts or prefixes up to /30; /32 is converted to a host address."
+  }
 
   type = list(string)
   validation {

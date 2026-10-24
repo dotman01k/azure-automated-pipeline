@@ -70,3 +70,8 @@ run "internet_wide_access_rejected" {
 
 }
 
+
+override_data {
+  target = data.azurerm_client_config.current
+  values = { tenant_id = "00000000-0000-0000-0000-000000000002" }
+}
