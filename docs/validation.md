@@ -44,3 +44,11 @@ This expanded result includes Storage and the data-source file reorganization:
 
 Storage includes private Blob networking/DNS, Entra data RBAC, management-only provider provisioning, versioning, soft delete, point in time recovery configuration and lifecycle cooling. These checks do not prove live DNS, authorization, data access or successful recovery. The workload remains undeployed by these checks.
 
+## Dual platform deployment support
+
+[Run 40064871018](https://github.com/dotman01k/azure-automated-pipeline/actions/runs/40064871018) passed all twelve jobs for implementation commit `568e473d255e676088b4330cc07a20e7cc1597c6`: eleven service jobs and a separate Windows pipeline runtime job.
+
+The shared Python suite now has 58 passing tests; the 30 Terraform module mock runs and validation of eleven modules/22 environment roots also passed. PowerShell tests passed on Linux and Windows: both platform authentication branches, exact binary plan application with mocked commands, 16 provenance/tamper rejections, encrypted artifact byte round trips, ciphertext tampering, wrong/short keys and nonempty extraction destination rejection. No real Azure CLI or Terraform deployment is used in the pipeline integration test.
+
+The new deployment workflow is manual, requires the repository opt-in variable, separates protected Plan/Apply environments and uploads only encrypted saved plans. Actual GitHub/Azure DevOps federation, token refresh, required-reviewer settings, runner connectivity and live deployment remain account setup and acceptance tasks. See [dual-platform setup](github-actions.md). This evidence validates source and runtime logic, not configured cloud access or a live deployment.
+
