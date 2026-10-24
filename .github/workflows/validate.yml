@@ -26,3 +26,7 @@ jobs:
           terraform -chdir="$root" validate -no-color
         done
         terraform -chdir=modules/windows-vm test -no-color
+    - name: Exercise PowerShell validation entry point
+      run: |
+        pwsh -NoProfile -File scripts/Invoke-Terraform.ps1 -Environment dev -Operation validate
+        pwsh -NoProfile -File scripts/Invoke-Terraform.ps1 -Environment prod -Operation validate
