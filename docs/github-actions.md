@@ -1,6 +1,6 @@
 # Deploying with GitHub Actions or Azure DevOps
 
-Both platforms use the same service folders, Terraform 1.13.0, AzureRM 4.68.0, input checks, state keys, destructive-plan gate and reviewed saved plans. The Azure DevOps entry points remain in place. GitHub deployment is an additional **manual** workflow at `.github/workflows/deploy.yml`; pushing code continues to run source validation only.
+Both platforms use the same service folders, Terraform 1.13.0, AzureRM 4.68.0, input checks, state keys, destructive-plan gate and reviewed saved plans. Azure DevOps shows the actual Terraform CLI commands inline, using Prepare/RecordPlan/VerifyPlan helpers for authentication and safety checks. GitHub keeps the Complete script path. Both paths share the same state, policy and provenance logic. The Azure DevOps entry points remain in place. GitHub deployment is an additional **manual** workflow at `.github/workflows/deploy.yml`; pushing code continues to run source validation only.
 
 ## Platform choices
 
@@ -11,7 +11,7 @@ Both platforms use the same service folders, Terraform 1.13.0, AzureRM 4.68.0, i
 | Stage configuration | compute-service-environment variable group | Separate compute-service-environment-plan and -apply environments |
 | Deployment approval | Azure DevOps environment checks | GitHub Apply environment required reviewers |
 | Saved plan | Restricted private Azure DevOps artifact | Authenticated encrypted GitHub artifact |
-| Shared runner | Invoke-Terraform.ps1, default AzureDevOps | Invoke-Terraform.ps1 -Platform GitHubActions |
+| Shared runner | Literal Terraform CLI in YAML with AzureDevOps helper phases | Invoke-Terraform.ps1 -Platform GitHubActions |
 
 For example, AKS Dev uses GitHub environments `compute-aks-dev-plan` and `compute-aks-dev-apply`. These are GitHub objects, separate from Azure DevOps's `compute-aks-dev` environment.
 

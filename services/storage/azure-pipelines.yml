@@ -1,4 +1,4 @@
-# Standalone pipeline for storage. Full stages are included below.
+# Standalone pipeline for storage. Terraform commands are visible below.
 trigger: none
 pr: none
 parameters:
@@ -43,12 +43,26 @@ stages:
         pwsh: true
         filePath: scripts/Install-Terraform.ps1
     - task: PowerShell@2
+      displayName: Terraform fmt, init and validate
       inputs:
         pwsh: true
-        filePath: scripts/Invoke-Terraform.ps1
-        arguments: -Service ${{ parameters.service }} -Environment ${{ parameters.environment }} -Operation validate
+        targetType: inline
+        script: |
+          $ErrorActionPreference = 'Stop'
+          $root = $env:BUILD_SOURCESDIRECTORY
+          Set-Location $root
+          terraform fmt -check -recursive
+          if ($LASTEXITCODE) { throw 'Terraform formatting failed.' }
+          Set-Location (Join-Path $root "services/$env:SERVICE/environments/$env:TARGET_ENVIRONMENT")
+          terraform init -backend=false -input=false -lockfile=readonly
+          if ($LASTEXITCODE) { throw 'Terraform validation init failed.' }
+          terraform validate -no-color
+          if ($LASTEXITCODE) { throw 'Terraform validation failed.' }
+          python "$root/scripts/validate_inputs.py" terraform.tfvars.json
+          if ($LASTEXITCODE) { throw 'Input validation failed.' }
       env:
-        TF_SECRET_JSON: $(TF_SECRET_JSON)
+        SERVICE: ${{ parameters.service }}
+        TARGET_ENVIRONMENT: ${{ parameters.environment }}
     - task: PowerShell@2
       inputs:
         pwsh: true
@@ -77,15 +91,33 @@ stages:
         pwsh: true
         filePath: scripts/Install-Terraform.ps1
     - task: AzureCLI@2
+      displayName: Terraform init and plan
       inputs:
         azureSubscription: ${{ parameters.serviceConnection }}
         addSpnToEnvironment: true
         scriptType: pscore
-        scriptLocation: scriptPath
-        scriptPath: scripts/Invoke-Terraform.ps1
-        arguments: -Service ${{ parameters.service }} -Environment ${{ parameters.environment }} -Operation plan -ArtifactDirectory "$(Build.ArtifactStagingDirectory)/approved-plan"
+        scriptLocation: inlineScript
+        inlineScript: |
+          $ErrorActionPreference = 'Stop'
+          $helper = Join-Path $env:BUILD_SOURCESDIRECTORY 'scripts/Invoke-Terraform.ps1'
+          $artifactDirectory = Join-Path $env:BUILD_ARTIFACTSTAGINGDIRECTORY 'approved-plan'
+          & $helper -Service $env:SERVICE -Environment $env:TARGET_ENVIRONMENT -Operation plan -Phase Prepare -ArtifactDirectory $artifactDirectory
+          terraform init -input=false -reconfigure -lockfile=readonly `
+            "-backend-config=resource_group_name=$env:STATE_RESOURCE_GROUP" `
+            "-backend-config=storage_account_name=$env:STATE_STORAGE_ACCOUNT" `
+            "-backend-config=container_name=$env:STATE_CONTAINER" `
+            "-backend-config=key=$env:TF_STATE_KEY" `
+            -backend-config=use_azuread_auth=true -backend-config=use_oidc=true
+          if ($LASTEXITCODE) { throw 'Terraform backend init failed.' }
+          New-Item -ItemType Directory -Path $artifactDirectory -Force | Out-Null
+          terraform plan -input=false -lock-timeout=120s "-out=$artifactDirectory/platform.tfplan"
+          if ($LASTEXITCODE) { throw 'Terraform plan failed.' }
+          # Reject destructive plans and record the saved-plan hash/provenance.
+          & $helper -Service $env:SERVICE -Environment $env:TARGET_ENVIRONMENT -Operation plan -Phase RecordPlan -ArtifactDirectory $artifactDirectory
         visibleAzLogin: false
       env:
+        SERVICE: ${{ parameters.service }}
+        TARGET_ENVIRONMENT: ${{ parameters.environment }}
         SYSTEM_ACCESSTOKEN: $(System.AccessToken)
         SYSTEM_OIDCREQUESTURI: $(System.OidcRequestUri)
         ARM_ADO_PIPELINE_SERVICE_CONNECTION_ID: $(AZURE_SERVICE_CONNECTION_ID)
@@ -128,15 +160,32 @@ stages:
               pwsh: true
               filePath: scripts/Install-Terraform.ps1
           - task: AzureCLI@2
+            displayName: Terraform init and apply approved saved plan
             inputs:
               azureSubscription: ${{ parameters.serviceConnection }}
               addSpnToEnvironment: true
               scriptType: pscore
-              scriptLocation: scriptPath
-              scriptPath: scripts/Invoke-Terraform.ps1
-              arguments: -Service ${{ parameters.service }} -Environment ${{ parameters.environment }} -Operation apply -ArtifactDirectory "$(Pipeline.Workspace)/approved-plan"
+              scriptLocation: inlineScript
+              inlineScript: |
+                $ErrorActionPreference = 'Stop'
+                $helper = Join-Path $env:BUILD_SOURCESDIRECTORY 'scripts/Invoke-Terraform.ps1'
+                $artifactDirectory = Join-Path $env:PIPELINE_WORKSPACE 'approved-plan'
+                & $helper -Service $env:SERVICE -Environment $env:TARGET_ENVIRONMENT -Operation apply -Phase Prepare -ArtifactDirectory $artifactDirectory
+                terraform init -input=false -reconfigure -lockfile=readonly `
+                  "-backend-config=resource_group_name=$env:STATE_RESOURCE_GROUP" `
+                  "-backend-config=storage_account_name=$env:STATE_STORAGE_ACCOUNT" `
+                  "-backend-config=container_name=$env:STATE_CONTAINER" `
+                  "-backend-config=key=$env:TF_STATE_KEY" `
+                  -backend-config=use_azuread_auth=true -backend-config=use_oidc=true
+                if ($LASTEXITCODE) { throw 'Terraform backend init failed.' }
+                # Verify the same-run plan, its hash/backend and destructive-plan policy first.
+                & $helper -Service $env:SERVICE -Environment $env:TARGET_ENVIRONMENT -Operation apply -Phase VerifyPlan -ArtifactDirectory $artifactDirectory
+                terraform apply -input=false -lock-timeout=120s "$artifactDirectory/platform.tfplan"
+                if ($LASTEXITCODE) { throw 'Terraform apply failed.' }
               visibleAzLogin: false
             env:
+              SERVICE: ${{ parameters.service }}
+              TARGET_ENVIRONMENT: ${{ parameters.environment }}
               SYSTEM_ACCESSTOKEN: $(System.AccessToken)
               SYSTEM_OIDCREQUESTURI: $(System.OidcRequestUri)
               ARM_ADO_PIPELINE_SERVICE_CONNECTION_ID: $(AZURE_SERVICE_CONNECTION_ID)

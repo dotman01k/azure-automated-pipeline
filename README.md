@@ -39,7 +39,7 @@ These are ten selected compute services plus Azure Storage, not an official popu
 
 Use Azure DevOps with its existing root or service pipeline, or use GitHub Actions → Deploy Azure service. Both share Terraform code, backend keys and policy checks. GitHub deployment stays disabled until `GH_DEPLOY_ENABLED=true` and the protected environments are configured. It encrypts saved plan artifacts for this public repository. Follow [GitHub setup and plan review](docs/github-actions.md); keep one active platform run per service/environment.
 
-The root `azure-pipelines.yml` contains the full Azure DevOps flow directly; there is no separate shared stage template. Each service pipeline also contains the full stages, with its service selection fixed. CI compares their stages and variables with the root pipeline to prevent deployment logic from drifting.
+The root `azure-pipelines.yml` contains the full Azure DevOps flow and literal `terraform fmt`, `init`, `validate`, `plan` and `apply` commands directly; there is no separate shared stage template. Each service pipeline also contains the full stages, with its service selection fixed. CI compares their stages and variables with the root pipeline to prevent deployment logic from drifting. The Prepare helper sets authentication, secret inputs and the state key; RecordPlan/VerifyPlan enforce policy and saved-plan provenance. Azure YAML runs the actual Terraform CLI commands between those helpers.
 
 ## Shared pipeline behavior
 

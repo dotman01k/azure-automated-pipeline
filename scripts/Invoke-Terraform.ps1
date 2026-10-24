@@ -4,9 +4,13 @@ param(
     [Parameter(Mandatory)][ValidateSet('dev','prod')][string]$Environment,
     [Parameter(Mandatory)][ValidateSet('validate','plan','apply')][string]$Operation,
     [ValidateSet('AzureDevOps','GitHubActions')][string]$Platform = 'AzureDevOps',
+    [ValidateSet('Complete','Prepare','RecordPlan','VerifyPlan')][string]$Phase = 'Complete',
     [string]$ArtifactDirectory
 )
 $ErrorActionPreference = 'Stop'
+if (($Operation -eq 'validate' -and $Phase -ne 'Complete') -or
+    ($Phase -eq 'RecordPlan' -and $Operation -ne 'plan') -or
+    ($Phase -eq 'VerifyPlan' -and $Operation -ne 'apply')) { throw 'Invalid operation/phase combination.' }
 $root = Split-Path $PSScriptRoot -Parent
 $directory = Join-Path $root "services/$Service/environments/$Environment"
 $project = Get-Content (Join-Path $root "services/$Service/project.json") -Raw | ConvertFrom-Json
@@ -74,17 +78,22 @@ $env:ARM_SUBSCRIPTION_ID = $subscription.Trim()
 $config = Get-Content terraform.tfvars.json -Raw | ConvertFrom-Json
 if ($config.subscription_id -ne $env:ARM_SUBSCRIPTION_ID) { throw 'Service connection and Terraform subscription differ.' }
 Invoke-Checked python @((Join-Path $PSScriptRoot 'validate_inputs.py'),'terraform.tfvars.json','--live')
-Invoke-Checked terraform @('init','-input=false','-reconfigure','-lockfile=readonly',
-    "-backend-config=resource_group_name=$env:STATE_RESOURCE_GROUP",
-    "-backend-config=storage_account_name=$env:STATE_STORAGE_ACCOUNT",
-    "-backend-config=container_name=$env:STATE_CONTAINER",
-    "-backend-config=key=$stateKey",
-    '-backend-config=use_azuread_auth=true','-backend-config=use_oidc=true')
+# Azure DevOps runs the visible Terraform CLI commands in YAML between helper phases.
+$env:TF_STATE_KEY = $stateKey
+if ($Phase -eq 'Prepare') { return }
+if ($Phase -eq 'Complete') {
+    Invoke-Checked terraform @('init','-input=false','-reconfigure','-lockfile=readonly',
+        "-backend-config=resource_group_name=$env:STATE_RESOURCE_GROUP",
+        "-backend-config=storage_account_name=$env:STATE_STORAGE_ACCOUNT",
+        "-backend-config=container_name=$env:STATE_CONTAINER",
+        "-backend-config=key=$stateKey",
+        '-backend-config=use_azuread_auth=true','-backend-config=use_oidc=true')
+}
 $planPath = Join-Path $ArtifactDirectory 'platform.tfplan'
 $manifestPath = Join-Path $ArtifactDirectory 'manifest.json'
 if ($Operation -eq 'plan') {
     New-Item -ItemType Directory -Path $ArtifactDirectory -Force | Out-Null
-    Invoke-Checked terraform @('plan','-input=false','-lock-timeout=120s',"-out=$planPath")
+    if ($Phase -eq 'Complete') { Invoke-Checked terraform @('plan','-input=false','-lock-timeout=120s',"-out=$planPath") }
     $json = & terraform show -json $planPath
     if ($LASTEXITCODE) { throw 'Cannot decode saved plan.' }
     $privateJson = Join-Path $ArtifactDirectory 'private-plan.json'
@@ -114,5 +123,5 @@ if ($Operation -eq 'plan') {
     $json | Set-Content $temp -Encoding utf8
     try { Invoke-Checked python @((Join-Path $PSScriptRoot 'plan_policy.py'),$temp) }
     finally { Remove-Item $temp -Force -ErrorAction SilentlyContinue }
-    Invoke-Checked terraform @('apply','-input=false','-lock-timeout=120s',$planPath)
+    if ($Phase -eq 'Complete') { Invoke-Checked terraform @('apply','-input=false','-lock-timeout=120s',$planPath) }
 }

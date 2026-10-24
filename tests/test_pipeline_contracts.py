@@ -48,3 +48,17 @@ class PipelineContracts(unittest.TestCase):
    self.assertEqual(task['env']['SYSTEM_OIDCREQUESTURI'],'$(System.OidcRequestUri)')
    self.assertEqual(task['env']['ARM_ADO_PIPELINE_SERVICE_CONNECTION_ID'],'$(AZURE_SERVICE_CONNECTION_ID)')
    self.assertTrue(task['inputs']['addSpnToEnvironment'])
+
+ def test_terraform_commands_are_visible_and_guarded(self):
+  p=yaml.safe_load((ROOT/'azure-pipelines.yml').read_text())
+  validate=p['stages'][0]['jobs'][0]['steps']
+  validation=next(x['inputs']['script'] for x in validate if x.get('displayName')=='Terraform fmt, init and validate')
+  for command in ['terraform fmt','terraform init','terraform validate']:
+   self.assertIn(command,validation)
+  plan=next(x for x in p['stages'][1]['jobs'][0]['steps'] if x.get('task')=='AzureCLI@2')['inputs']
+  apply=next(x for x in p['stages'][2]['jobs'][0]['strategy']['runOnce']['deploy']['steps'] if x.get('task')=='AzureCLI@2')['inputs']
+  self.assertEqual(plan['scriptLocation'],'inlineScript')
+  self.assertLess(plan['inlineScript'].index('-Phase Prepare'),plan['inlineScript'].index('terraform init'))
+  self.assertLess(plan['inlineScript'].index('terraform plan'),plan['inlineScript'].index('-Phase RecordPlan'))
+  self.assertLess(apply['inlineScript'].index('-Phase VerifyPlan'),apply['inlineScript'].index('terraform apply'))
+  self.assertIn('$artifactDirectory/platform.tfplan',apply['inlineScript'])

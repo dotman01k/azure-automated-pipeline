@@ -8,10 +8,14 @@ Copy-Item "$root/scripts/Invoke-Terraform.ps1","$root/scripts/validate_inputs.py
 [IO.File]::WriteAllText("$temp/services/virtual-machines/project.json",'{"secret_variables":["admin_password"]}')
 [IO.File]::WriteAllText("$temp/services/virtual-machines/environments/dev/terraform.tfvars.json",'{"subscription_id":"9d046dba-8c48-4fb8-91cc-a6011d06348b"}')
 $global:fakeApplyCount = 0
+$global:fakeCommands = @()
 function global:az { $global:LASTEXITCODE = 0; '9d046dba-8c48-4fb8-91cc-a6011d06348b' }
 function global:terraform {
     $global:LASTEXITCODE = 0
+    $global:fakeCommands += [string]$args[0]
     switch ($args[0]) {
+        'fmt' { }
+        'validate' { }
         'init' { }
         'plan' {
             $target = @($args | Where-Object { $_ -like '-out=*' })[0].Substring(5)
@@ -63,7 +67,45 @@ try {
         if ($global:fakeApplyCount -ne $before) { throw 'Rejected artifact reached Terraform apply.' }
     }
     if ($global:fakeApplyCount -ne 2) { throw 'Both platform happy paths must apply the mock plan.' }
-    Write-Host 'Pipeline integration passed: both auth paths, exact plan apply and 16 provenance/tamper rejections.'
+    # Execute the real inline Terraform blocks from Azure YAML with the same fake CLIs.
+    $blocks = @()
+    $lines = Get-Content (Join-Path $root 'azure-pipelines.yml')
+    for ($i=0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -match '^(\s+)(?:script|inlineScript):\s*\|$') {
+            $indent = $Matches[1].Length
+            $body = @()
+            $i++
+            while ($i -lt $lines.Count -and ($lines[$i].Trim().Length -eq 0 -or ($lines[$i] -match '^\s+' -and $Matches[0].Length -gt $indent))) {
+                $body += if ($lines[$i].Trim().Length) { $lines[$i].Substring($indent+2) } else { '' }
+                $i++
+            }
+            $i--
+            $text = $body -join "`n"
+            if ($text -match '(?m)^terraform (?:fmt|init|plan|apply) ') { $blocks += [scriptblock]::Create($text) }
+        }
+    }
+    if ($blocks.Count -ne 3) { throw 'Expected literal Validate, Plan and Apply command blocks.' }
+    $env:BUILD_SOURCESDIRECTORY=$temp
+    $env:BUILD_ARTIFACTSTAGINGDIRECTORY="$temp/ado-staging"
+    $env:PIPELINE_WORKSPACE="$temp/ado-workspace"
+    $env:SERVICE='virtual-machines';$env:TARGET_ENVIRONMENT='dev'
+    $env:ARM_ADO_PIPELINE_SERVICE_CONNECTION_ID='mock-service-connection'
+    $global:fakeCommands=@()
+    & $blocks[0]
+    & $blocks[1]
+    New-Item -ItemType Directory "$temp/ado-workspace" -Force | Out-Null
+    Copy-Item "$temp/ado-staging/approved-plan" "$temp/ado-workspace/approved-plan" -Recurse
+    & $blocks[2]
+    foreach ($entry in @{init=3;plan=1;apply=1;fmt=1;validate=1}.GetEnumerator()) {
+        if (@($global:fakeCommands | Where-Object { $_ -eq $entry.Key }).Count -ne $entry.Value) { throw "Unexpected inline Terraform command count: $($entry.Key)" }
+    }
+    if ($global:fakeApplyCount -ne 3) { throw 'Literal YAML apply must apply exactly one saved mock plan.' }
+    [IO.File]::WriteAllText("$temp/ado-workspace/approved-plan/platform.tfplan",'tampered-inline-plan')
+    Expect-Failure { & $blocks[2] }
+    if ($global:fakeApplyCount -ne 3) { throw 'Tampered inline plan reached Terraform apply.' }
+    Expect-Failure { & $runner -Service virtual-machines -Environment dev -Operation apply -Phase RecordPlan -ArtifactDirectory "$temp/artifacts" }
+    Expect-Failure { & $runner -Service virtual-machines -Environment dev -Operation plan -Phase VerifyPlan -ArtifactDirectory "$temp/artifacts" }
+    Write-Host 'Pipeline integration passed: both auth paths, 16 provenance/tamper rejections, literal YAML CLI flow, inline tamper rejection and invalid helper phase rejection.'
 } finally {
     Set-Location $originalDirectory
     Remove-Item Function:global:az,Function:global:terraform -ErrorAction SilentlyContinue
