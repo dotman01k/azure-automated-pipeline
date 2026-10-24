@@ -1,0 +1,6 @@
+resource_group_name = "rg-platform-state"
+storage_account_name = "REPLACE_WITH_UNIQUE_ACCOUNT"
+container_name = "tfstate"
+key = "windows-vm-dev.tfstate"
+use_azuread_auth = true
+use_oidc = true
