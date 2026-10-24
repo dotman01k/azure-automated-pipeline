@@ -55,7 +55,7 @@ The module directory keeps the collection's shared `compute` convention. The sel
 
 The deployment identity needs Contributor on the workload RG, scoped role assignment authority there, and Storage Blob Data Contributor on the **backend** independently. On the existing network it needs sufficient read permissions and private endpoint subnet join permission; scoped Network Contributor on the selected subnet plus Reader on its VNet/RG is a practical baseline to review. Contributor on the workload RG alone does not grant cross-RG network access.
 
-The configured data principal receives Storage Blob Data Contributor on this dedicated workload account. Management Contributor alone does not authorize blob reads. No storage key, connection string or client secret is returned in the module outputs. Container creation uses `storage_account_id`, which the pinned AzureRM provider sends through the management API. Normal data operations must use Entra authorization and the private endpoint. Any provider refresh path needing data-plane access also requires a privately connected agent; do not work around that by enabling public access or storage keys.
+The configured data principal receives Storage Blob Data Contributor on this dedicated workload account. Management Contributor alone does not authorize blob reads. No storage key, connection string or client secret is returned in the module outputs. Container creation uses `storage_account_id`, which the pinned AzureRM provider sends through the management API. Normal data operations must use Entra authorization and the private endpoint. Both roots set `features.storage.data_plane_available=false` for the pinned provider. This prevents the storage account create/read path from waiting on public data endpoints before its dependent private endpoint exists. This reference manages account properties, containers and lifecycle through ARM; queue/static website data-plane properties are not configured. Preserve this feature setting when reusing the module. Blob I/O acceptance still requires the privately connected client.
 
 ## Access verification
 
@@ -100,7 +100,7 @@ Charges can include stored current/previous versions, soft-deleted data, change 
 | KeyBasedAuthenticationNotPermitted | Use `--auth-mode login`; do not enable shared keys |
 | Private endpoint join denied | Cross-RG subnet permission for the deployment identity |
 | DNS link conflicts | Existing central zone ownership; adapt to shared DNS rather than creating overlapping zones |
-| Provider refresh denied | Agent private connectivity, provider API/data-plane access and assigned permissions |
+| Provider refresh denied | Preserve the storage data_plane_available=false feature, check management API permission and the pinned provider version |
 | ZRS unavailable | Region and storage SKU support; review an intentional replication change |
 | Replacement/deletion rejected | Shared plan policy and lifecycle guards; review maintenance and ownership first |
 
