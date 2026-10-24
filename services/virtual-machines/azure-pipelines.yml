@@ -1,6 +1,11 @@
+# Standalone pipeline for virtual-machines. Full stages are included below.
 trigger: none
 pr: none
 parameters:
+- name: service
+  type: string
+  default: virtual-machines
+  values: [virtual-machines]
 - name: environment
   type: string
   default: dev
@@ -15,11 +20,127 @@ parameters:
 - name: serviceConnection
   type: string
   default: sc-compute-dev
-extends:
-  template: ../../pipelines/compute.yml
-  parameters:
-    service: virtual-machines
-    environment: ${{ parameters.environment }}
-    operation: ${{ parameters.operation }}
-    agentPool: ${{ parameters.agentPool }}
-    serviceConnection: ${{ parameters.serviceConnection }}
+# Environment settings are selected from this Azure DevOps variable group.
+variables:
+- group: compute-${{ parameters.service }}-${{ parameters.environment }}
+# Read the complete deployment flow below: Validate, Plan, then approved Apply.
+stages:
+# 1. Check source and the selected Terraform environment.
+- stage: Validate
+  jobs:
+  - job: ValidateSource
+    pool:
+      name: ${{ parameters.agentPool }}
+      demands: Agent.OS -equals Windows_NT
+    workspace:
+      clean: all
+    steps:
+    - checkout: self
+      clean: true
+      persistCredentials: false
+    - task: PowerShell@2
+      inputs:
+        pwsh: true
+        filePath: scripts/Install-Terraform.ps1
+    - task: PowerShell@2
+      inputs:
+        pwsh: true
+        filePath: scripts/Invoke-Terraform.ps1
+        arguments: -Service ${{ parameters.service }} -Environment ${{ parameters.environment }} -Operation validate
+      env:
+        TF_SECRET_JSON: $(TF_SECRET_JSON)
+    - task: PowerShell@2
+      inputs:
+        pwsh: true
+        targetType: inline
+        script: |
+          python -m pip install -r requirements-validation.txt
+          if ($LASTEXITCODE) { throw 'Validation dependency installation failed.' }
+          python -m unittest discover -s tests -v
+          if ($LASTEXITCODE) { throw 'Policy tests failed.' }
+# 2. Authenticate and create the exact saved plan for review.
+- stage: Plan
+  dependsOn: Validate
+  jobs:
+  - job: CreatePlan
+    pool:
+      name: ${{ parameters.agentPool }}
+      demands: Agent.OS -equals Windows_NT
+    workspace:
+      clean: all
+    steps:
+    - checkout: self
+      clean: true
+      persistCredentials: false
+    - task: PowerShell@2
+      inputs:
+        pwsh: true
+        filePath: scripts/Install-Terraform.ps1
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: ${{ parameters.serviceConnection }}
+        addSpnToEnvironment: true
+        scriptType: pscore
+        scriptLocation: scriptPath
+        scriptPath: scripts/Invoke-Terraform.ps1
+        arguments: -Service ${{ parameters.service }} -Environment ${{ parameters.environment }} -Operation plan -ArtifactDirectory "$(Build.ArtifactStagingDirectory)/approved-plan"
+        visibleAzLogin: false
+      env:
+        SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+        SYSTEM_OIDCREQUESTURI: $(System.OidcRequestUri)
+        ARM_ADO_PIPELINE_SERVICE_CONNECTION_ID: $(AZURE_SERVICE_CONNECTION_ID)
+        STATE_RESOURCE_GROUP: $(STATE_RESOURCE_GROUP)
+        STATE_STORAGE_ACCOUNT: $(STATE_STORAGE_ACCOUNT)
+        STATE_CONTAINER: $(STATE_CONTAINER)
+        TF_SECRET_JSON: $(TF_SECRET_JSON)
+    - task: PublishPipelineArtifact@1
+      inputs:
+        targetPath: $(Build.ArtifactStagingDirectory)/approved-plan
+        artifact: approved-plan
+# 3. Wait for configured environment approval, then apply that saved plan.
+- stage: Apply
+  dependsOn: Plan
+  condition: and(succeeded(), eq('${{ parameters.operation }}', 'apply'), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  lockBehavior: sequential
+  jobs:
+  - deployment: ApplyApprovedPlan
+    environment: compute-${{ parameters.service }}-${{ parameters.environment }}
+    pool:
+      name: ${{ parameters.agentPool }}
+      demands: Agent.OS -equals Windows_NT
+    workspace:
+      clean: all
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+            clean: true
+            persistCredentials: false
+          - download: none
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              buildType: current
+              artifactName: approved-plan
+              targetPath: $(Pipeline.Workspace)/approved-plan
+          - task: PowerShell@2
+            inputs:
+              pwsh: true
+              filePath: scripts/Install-Terraform.ps1
+          - task: AzureCLI@2
+            inputs:
+              azureSubscription: ${{ parameters.serviceConnection }}
+              addSpnToEnvironment: true
+              scriptType: pscore
+              scriptLocation: scriptPath
+              scriptPath: scripts/Invoke-Terraform.ps1
+              arguments: -Service ${{ parameters.service }} -Environment ${{ parameters.environment }} -Operation apply -ArtifactDirectory "$(Pipeline.Workspace)/approved-plan"
+              visibleAzLogin: false
+            env:
+              SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+              SYSTEM_OIDCREQUESTURI: $(System.OidcRequestUri)
+              ARM_ADO_PIPELINE_SERVICE_CONNECTION_ID: $(AZURE_SERVICE_CONNECTION_ID)
+              STATE_RESOURCE_GROUP: $(STATE_RESOURCE_GROUP)
+              STATE_STORAGE_ACCOUNT: $(STATE_STORAGE_ACCOUNT)
+              STATE_CONTAINER: $(STATE_CONTAINER)
+              TF_SECRET_JSON: $(TF_SECRET_JSON)

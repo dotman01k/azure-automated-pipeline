@@ -4,7 +4,8 @@ import yaml
 ROOT=Path(__file__).resolve().parents[1]
 class PipelineContracts(unittest.TestCase):
  def test_shared_apply_guard(self):
-  p=yaml.safe_load((ROOT/'pipelines/compute.yml').read_text())
+  p=yaml.safe_load((ROOT/'azure-pipelines.yml').read_text())
+  self.assertNotIn('extends',p)
   self.assertEqual([x['stage'] for x in p['stages']],['Validate','Plan','Apply'])
   self.assertIn('refs/heads/main',p['stages'][2]['condition'])
   self.assertEqual(p['stages'][2]['lockBehavior'],'sequential')
@@ -12,8 +13,13 @@ class PipelineContracts(unittest.TestCase):
   for service in (ROOT/'services').iterdir():
    p=yaml.safe_load((service/'azure-pipelines.yml').read_text())
    self.assertEqual(p['trigger'],'none');self.assertEqual(p['pr'],'none')
-   self.assertEqual(p['extends']['parameters']['service'],service.name)
-   self.assertTrue((service/p['extends']['template']).is_file())
+   self.assertNotIn('extends',p)
+   selected=next(x for x in p['parameters'] if x['name']=='service')
+   self.assertEqual(selected['default'],service.name)
+   self.assertEqual(selected['values'],[service.name])
+   canonical=yaml.safe_load((ROOT/'azure-pipelines.yml').read_text())
+   self.assertEqual(p['stages'],canonical['stages'])
+   self.assertEqual(p['variables'],canonical['variables'])
  def test_selector_covers_all_services(self):
   p=yaml.safe_load((ROOT/'azure-pipelines.yml').read_text())
   names=next(x for x in p['parameters'] if x['name']=='service')['values']
@@ -33,7 +39,7 @@ class PipelineContracts(unittest.TestCase):
   self.assertEqual(task['constraints']['maxTaskRetryCount'],1)
 
  def test_refreshable_oidc_for_plan_and_apply(self):
-  p=yaml.safe_load((ROOT/'pipelines/compute.yml').read_text())
+  p=yaml.safe_load((ROOT/'azure-pipelines.yml').read_text())
   plan=p['stages'][1]['jobs'][0]['steps']
   apply=p['stages'][2]['jobs'][0]['strategy']['runOnce']['deploy']['steps']
   for steps in (plan,apply):
