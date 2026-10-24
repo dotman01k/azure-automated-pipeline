@@ -44,3 +44,13 @@ jobs:
       run: |
         pwsh -NoProfile -File scripts/Invoke-Terraform.ps1 -Service "$SERVICE" -Environment dev -Operation validate
         pwsh -NoProfile -File scripts/Invoke-Terraform.ps1 -Service "$SERVICE" -Environment prod -Operation validate
+  windows-pipeline-runtime:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      with:
+        persist-credentials: false
+    - run: pwsh -NoProfile -File tests/Test-Syntax.ps1
+    - run: pwsh -NoProfile -File tests/Test-PlanArtifact.ps1
+    - run: pwsh -NoProfile -File tests/Test-PipelineRunner.ps1
