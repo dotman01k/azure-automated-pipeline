@@ -23,7 +23,7 @@ def validate(v,live=False):
  if live:
   if 'offline-example' in v.get('ssh_public_key',''):raise ValueError('Replace the offline test SSH key')
   if v.get('client_certificate_thumbprint','')=='A'*40:raise ValueError('Replace the example certificate thumbprint')
-  for key in ['user_group_object_id','admin_group_ids']:
+  for key in ['user_group_object_id','admin_group_ids','data_principal_id']:
    if key in v:
     ids=v[key] if isinstance(v[key],list) else [v[key]]
     if any(str(uuid.UUID(x)).startswith('00000000-0000-0000-0000-') for x in ids):raise ValueError('Replace example group IDs')

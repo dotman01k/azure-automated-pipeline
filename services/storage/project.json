@@ -1,0 +1,13 @@
+{
+  "service": "storage",
+  "title": "Azure Storage",
+  "secret_variables": [],
+  "providers": [
+    "Microsoft.Storage",
+    "Microsoft.Network"
+  ],
+  "network": true,
+  "role_assignment": true,
+  "cost": "Blob capacity, retained versions, change feed, transactions, Cool retrieval/minimum retention, private endpoint and DNS.",
+  "boundary": "Private Blob Storage on an existing routed network; no queue, table, file share, HNS or geo disaster recovery is configured."
+}

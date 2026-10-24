@@ -13,7 +13,7 @@ jobs:
       fail-fast: false
       max-parallel: 4
       matrix:
-        service: ["aks", "app-service", "batch", "container-apps", "container-instances", "functions", "service-fabric", "virtual-desktop", "virtual-machines", "vm-scale-sets"]
+        service: ["aks", "app-service", "batch", "container-apps", "container-instances", "functions", "service-fabric", "storage", "virtual-desktop", "virtual-machines", "vm-scale-sets"]
     env:
       SERVICE: ${{ matrix.service }}
     steps:

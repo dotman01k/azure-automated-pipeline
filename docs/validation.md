@@ -1,6 +1,6 @@
 # Compute collection validation
 
-The CI matrix runs all ten service folders. Each job performs shared Python tests, PowerShell syntax parsing, recursive Terraform formatting, provider validation for its module and two environment roots, module mock plans, and the PowerShell validate entry point against both roots. Dependency versions and lock files are committed.
+The CI matrix now runs all eleven service folders, including Storage. Each job performs shared Python tests, PowerShell syntax parsing, recursive Terraform formatting, provider validation for its module and two environment roots, module mock plans, and the PowerShell validate entry point against both roots. Dependency versions and lock files are committed.
 
 ## Recorded collection result
 
@@ -26,3 +26,6 @@ The Windows implementation initially passed 18 Python and four Terraform tests b
 
 Local Python, input, link and formatting checks are recorded during preparation. Provider plugin execution is restricted in the preparation runtime; hosted CI is the authority for provider validation/mock plans. A pass does not establish Azure DevOps server-side template expansion, service availability, capacity, authentication, application deployment, AVD session registration/login, Batch task execution or Service Fabric management/application behavior. Record those separately in a live acceptance run without publishing secrets or state.
 
+## Storage extension
+
+The Storage folder adds two environment roots and four Terraform mock runs. Shared Python tests now total 51. The ten-service result above predates this extension; its validation is recorded separately after the expanded matrix completes.

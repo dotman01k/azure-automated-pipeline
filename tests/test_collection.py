@@ -2,7 +2,7 @@ import importlib.util,json,unittest
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 spec=importlib.util.spec_from_file_location('inputs',ROOT/'scripts/validate_inputs.py');inputs=importlib.util.module_from_spec(spec);spec.loader.exec_module(inputs)
-SERVICES=['aks', 'app-service', 'batch', 'container-apps', 'container-instances', 'functions', 'service-fabric', 'virtual-desktop', 'virtual-machines', 'vm-scale-sets']
+SERVICES=['aks', 'app-service', 'batch', 'container-apps', 'container-instances', 'functions', 'service-fabric', 'storage', 'virtual-desktop', 'virtual-machines', 'vm-scale-sets']
 class CollectionTests(unittest.TestCase):
  def test_service_inventory(self):
   self.assertEqual(sorted(p.name for p in (ROOT/'services').iterdir() if p.is_dir()),SERVICES)

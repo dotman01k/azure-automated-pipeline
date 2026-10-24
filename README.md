@@ -1,12 +1,12 @@
-# Azure Automated Pipeline: Compute Collection
+# Azure Automated Pipeline: Compute and Storage
 
 [![Source validation](https://github.com/dotman01k/azure-automated-pipeline/actions/workflows/validate.yml/badge.svg)](https://github.com/dotman01k/azure-automated-pipeline/actions/workflows/validate.yml)
 
 **Author: Dotun Agbeluyi**
 
-Ten distinct Azure compute services in **one repository**, with a folder per service. Each folder has Terraform modules, Dev and Prod roots, public example inputs, provider lock files, mock tests, an Azure DevOps pipeline entry point and a service README. Common pipeline tooling is shared at the repository root.
+Eleven Azure compute and storage services in **one repository**, with a folder per service. Each folder has Terraform modules, Dev and Prod roots, public example inputs, provider lock files, mock tests, an Azure DevOps pipeline entry point and a service README. Common pipeline tooling is shared at the repository root.
 
-This collection is source to keep handy and adapt for specific environments. Services are separate deployment units: selecting one does not deploy all ten. Publishing the repository does not activate Azure infrastructure deployment. GitHub Actions performs source checks; Azure DevOps executes the live Validate → Plan → Apply pipeline after its service connection, agent and protected environment are configured.
+This collection is source to keep handy and adapt for specific environments. Services are separate deployment units: selecting one does not deploy all eleven. Publishing the repository does not activate Azure infrastructure deployment. GitHub Actions performs source checks; Azure DevOps executes the live Validate → Plan → Apply pipeline after its service connection, agent and protected environment are configured.
 
 ## Services
 
@@ -18,12 +18,13 @@ This collection is source to keep handy and adapt for specific environments. Ser
 | [Azure Container Apps](services/container-apps) | `services/container-apps` |
 | [Azure Container Instances](services/container-instances) | `services/container-instances` |
 | [Azure Functions](services/functions) | `services/functions` |
+| [Azure Storage](services/storage) | `services/storage` |
 | [Service Fabric Managed Clusters](services/service-fabric) | `services/service-fabric` |
 | [Azure Virtual Desktop](services/virtual-desktop) | `services/virtual-desktop` |
 | [Virtual Machines](services/virtual-machines) | `services/virtual-machines` |
 | [Virtual Machine Scale Sets](services/vm-scale-sets) | `services/vm-scale-sets` |
 
-These are ten selected compute services, not an official popularity ranking. Virtual Machines contains the earlier reconstructed Windows Server/Bastion implementation; the other folders are newly authored infrastructure references. The collection is not an export of the original local InfraProject repository. The separate [azure-aks-platform](https://github.com/dotman01k/azure-aks-platform) repository retains its own completed deployment evidence; it is not evidence that these new references were deployed.
+These are ten selected compute services plus Azure Storage, not an official popularity ranking. Virtual Machines contains the earlier reconstructed Windows Server/Bastion implementation; the other folders are newly authored infrastructure references. The collection is not an export of the original local InfraProject repository. The separate [azure-aks-platform](https://github.com/dotman01k/azure-aks-platform) repository retains its own completed deployment evidence; it is not evidence that these new references were deployed.
 
 ## How to use it
 
@@ -62,7 +63,7 @@ The normal pipeline rejects deletions, replacements, forget actions and incomple
 | `pipelines/compute.yml` | Shared Azure DevOps stages |
 | `scripts` | Pinned Terraform install, federated auth, input checks, plan policy and provenance |
 | `tests` | Shared policy, input, collection and application tests |
-| `.github/workflows/validate.yml` | Credential-free matrix validation across all ten services |
+| `.github/workflows/validate.yml` | Credential-free matrix validation across all eleven services |
 
 New state keys are `compute/<service>/<environment>.tfstate`. The moved Virtual Machines project preserves its existing `windows-vm-dev.tfstate` and `windows-vm-prod.tfstate` keys and `module.windows_vm` resource addresses. See [migration notes](docs/migration.md) before updating an already configured pipeline.
 
@@ -76,7 +77,7 @@ The privacy boundary varies by service: some use private endpoints or VNet addre
 
 ## Validation and scope
 
-Terraform 1.13.0 and AzureRM 4.68.0 are pinned. Hosted CI validates 20 environment roots and ten modules, exercises PowerShell validation for both roots, runs the module mock tests and the shared Python suite. [Validation notes](docs/validation.md) link the recorded checks and explain what remains live acceptance.
+Terraform 1.13.0 and AzureRM 4.68.0 are pinned. Hosted CI validates 22 environment roots and eleven modules, exercises PowerShell validation for both roots, runs the module mock tests and the shared Python suite. [Validation notes](docs/validation.md) link the recorded checks and explain what remains live acceptance.
 
 Mock plans and offline tests check configuration and script behavior. They do not prove subscription quota, regional SKU availability, Azure DevOps server expansion, real authentication, image pull, guest extension behavior, application publishing, AVD login or Service Fabric recovery. Each folder documents its implemented scope and remaining acceptance checks. Production roots provide separate configuration/state; the word Prod does not establish HA or production approval.
 

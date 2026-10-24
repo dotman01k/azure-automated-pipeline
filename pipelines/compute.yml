@@ -1,7 +1,7 @@
 parameters:
 - name: service
   type: string
-  values: [aks, app-service, batch, container-apps, container-instances, functions, service-fabric, virtual-desktop, virtual-machines, vm-scale-sets]
+  values: [aks, app-service, batch, container-apps, container-instances, functions, service-fabric, storage, virtual-desktop, virtual-machines, vm-scale-sets]
 - name: environment
   type: string
   default: dev

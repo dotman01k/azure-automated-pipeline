@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][ValidateSet('aks','app-service','batch','container-apps','container-instances','functions','service-fabric','virtual-desktop','virtual-machines','vm-scale-sets')][string]$Service,
+    [Parameter(Mandatory)][ValidateSet('aks','app-service','batch','container-apps','container-instances','functions','service-fabric','storage','virtual-desktop','virtual-machines','vm-scale-sets')][string]$Service,
     [Parameter(Mandatory)][ValidateSet('dev','prod')][string]$Environment,
     [Parameter(Mandatory)][ValidateSet('validate','plan','apply')][string]$Operation,
     [string]$ArtifactDirectory
