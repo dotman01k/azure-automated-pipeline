@@ -28,4 +28,19 @@ Local Python, input, link and formatting checks are recorded during preparation.
 
 ## Storage extension
 
-The Storage folder adds two environment roots and four Terraform mock runs. Shared Python tests now total 51. The ten-service result above predates this extension; its validation is recorded separately after the expanded matrix completes.
+On 24 October 2026, [run 40063169402](https://github.com/dotman01k/azure-automated-pipeline/actions/runs/40063169402) passed all **eleven** service jobs for implementation commit `378edbd1a9846e21f4edcd8f130adb8a6c29c521`.
+
+This expanded result includes Storage and the data-source file reorganization:
+
+| Check | Result |
+| :--- | :--- |
+| Shared Python suite | 51 tests passed |
+| Terraform module mock runs | 30 passed, including four Storage runs |
+| Provider schema validation | Eleven modules and 22 environment roots passed |
+| PowerShell syntax and validate entry point | Passed for every service and both roots |
+| Recursive Terraform formatting | Passed |
+| Data source organization | 25 data blocks in 24 separate data.tf files; none in main.tf |
+| Local relative Markdown links | Passed |
+
+Storage includes private Blob networking/DNS, Entra data RBAC, management-only provider provisioning, versioning, soft delete, point in time recovery configuration and lifecycle cooling. These checks do not prove live DNS, authorization, data access or successful recovery. The workload remains undeployed by these checks.
+
