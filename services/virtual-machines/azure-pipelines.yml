@@ -1,4 +1,4 @@
-# Standalone pipeline for virtual-machines. Terraform commands are visible below.
+# Standalone pipeline for virtual-machines. Each Terraform action has a numbered stage.
 trigger: none
 pr: none
 parameters:
@@ -23,10 +23,47 @@ parameters:
 # Environment settings are selected from this Azure DevOps variable group.
 variables:
 - group: compute-${{ parameters.service }}-${{ parameters.environment }}
-# Read the complete deployment flow below: Validate, Plan, then approved Apply.
+# Read the numbered Terraform stages below: Init, Validate, Plan, then approved Apply.
 stages:
-# 1. Check source and the selected Terraform environment.
-- stage: Validate
+# Stage 1: initialize Terraform and check source formatting.
+- stage: TerraformInit
+  displayName: "Stage 1: Terraform Init"
+  jobs:
+  - job: InitSource
+    pool:
+      name: ${{ parameters.agentPool }}
+      demands: Agent.OS -equals Windows_NT
+    workspace:
+      clean: all
+    steps:
+    - checkout: self
+      clean: true
+      persistCredentials: false
+    - task: PowerShell@2
+      inputs:
+        pwsh: true
+        filePath: scripts/Install-Terraform.ps1
+    - task: PowerShell@2
+      displayName: Run terraform fmt and terraform init
+      inputs:
+        pwsh: true
+        targetType: inline
+        script: |
+          $ErrorActionPreference = 'Stop'
+          $root = $env:BUILD_SOURCESDIRECTORY
+          Set-Location $root
+          terraform fmt -check -recursive
+          if ($LASTEXITCODE) { throw 'Terraform formatting failed.' }
+          Set-Location (Join-Path $root "services/$env:SERVICE/environments/$env:TARGET_ENVIRONMENT")
+          terraform init -backend=false -input=false -lockfile=readonly
+          if ($LASTEXITCODE) { throw 'Terraform validation init failed.' }
+      env:
+        SERVICE: ${{ parameters.service }}
+        TARGET_ENVIRONMENT: ${{ parameters.environment }}
+# Stage 2: validate the selected environment and run input/policy tests.
+- stage: TerraformValidate
+  displayName: "Stage 2: Terraform Validate"
+  dependsOn: TerraformInit
   jobs:
   - job: ValidateSource
     pool:
@@ -43,17 +80,15 @@ stages:
         pwsh: true
         filePath: scripts/Install-Terraform.ps1
     - task: PowerShell@2
-      displayName: Terraform fmt, init and validate
+      displayName: Run terraform validate
       inputs:
         pwsh: true
         targetType: inline
         script: |
           $ErrorActionPreference = 'Stop'
           $root = $env:BUILD_SOURCESDIRECTORY
-          Set-Location $root
-          terraform fmt -check -recursive
-          if ($LASTEXITCODE) { throw 'Terraform formatting failed.' }
           Set-Location (Join-Path $root "services/$env:SERVICE/environments/$env:TARGET_ENVIRONMENT")
+          # Each stage has its own clean workspace, so initialize this job too.
           terraform init -backend=false -input=false -lockfile=readonly
           if ($LASTEXITCODE) { throw 'Terraform validation init failed.' }
           terraform validate -no-color
@@ -72,9 +107,10 @@ stages:
           if ($LASTEXITCODE) { throw 'Validation dependency installation failed.' }
           python -m unittest discover -s tests -v
           if ($LASTEXITCODE) { throw 'Policy tests failed.' }
-# 2. Authenticate and create the exact saved plan for review.
-- stage: Plan
-  dependsOn: Validate
+# Stage 3: create the saved Terraform plan for review.
+- stage: TerraformPlan
+  displayName: "Stage 3: Terraform Plan"
+  dependsOn: TerraformValidate
   jobs:
   - job: CreatePlan
     pool:
@@ -129,9 +165,10 @@ stages:
       inputs:
         targetPath: $(Build.ArtifactStagingDirectory)/approved-plan
         artifact: approved-plan
-# 3. Wait for configured environment approval, then apply that saved plan.
-- stage: Apply
-  dependsOn: Plan
+# Stage 4: apply only the reviewed saved plan after environment approval.
+- stage: TerraformApply
+  displayName: "Stage 4: Terraform Apply"
+  dependsOn: TerraformPlan
   condition: and(succeeded(), eq('${{ parameters.operation }}', 'apply'), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
   lockBehavior: sequential
   jobs:

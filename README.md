@@ -41,16 +41,19 @@ Use Azure DevOps with its existing root or service pipeline, or use GitHub Actio
 
 The root `azure-pipelines.yml` contains the full Azure DevOps flow and literal `terraform fmt`, `init`, `validate`, `plan` and `apply` commands directly; there is no separate shared stage template. Each service pipeline also contains the full stages, with its service selection fixed. CI compares their stages and variables with the root pipeline to prevent deployment logic from drifting. The Prepare helper sets authentication, secret inputs and the state key; RecordPlan/VerifyPlan enforce policy and saved-plan provenance. Azure YAML runs the actual Terraform CLI commands between those helpers.
 
+Azure DevOps displays four numbered stages: **Stage 1: Terraform Init**, **Stage 2: Terraform Validate**, **Stage 3: Terraform Plan**, and **Stage 4: Terraform Apply**. Each stage shows its Terraform command directly. Jobs have clean workspaces, so Validate, Plan and Apply also run the initialization needed by their own job; they do not assume files from Stage 1 exist on another agent. GitHub keeps its existing job layout.
+
 ## Shared pipeline behavior
 
 ```mermaid
 flowchart TD
-  E[Root selector or service entry point] --> V[Validate selected root]
-  V --> P[Plan with federated identity]
+  E[Root selector or service entry point] --> I[1. Terraform Init]
+  I --> V[2. Terraform Validate]
+  V --> P[3. Terraform Plan with federated identity]
   P --> G[Reject destructive plans]
   G --> A[Restricted saved plan artifact]
   A --> R[Environment review and exclusive lock]
-  R --> X[Verify provenance and apply exact plan]
+  R --> X[4. Terraform Apply exact approved plan]
   P --> B[Environment state blob]
   X --> B
 ```
@@ -68,7 +71,7 @@ All Terraform data sources live in a separate `data.tf` within the module or env
 | `services/<service>/environments/prod` | Independent Prod root |
 | `services/<service>/azure-pipelines.yml` | Standalone full pipeline fixed to this service |
 | `services/<service>/project.json` | Service identity, allowed secret names and provider registrations |
-| `azure-pipelines.yml` | Complete Azure DevOps parameters, variables, Validate, Plan and Apply stages |
+| `azure-pipelines.yml` | Complete Azure DevOps parameters, variables and numbered Init, Validate, Plan and Apply stages |
 | `scripts` | Pinned Terraform install, federated auth, input checks, plan policy and provenance |
 | `tests` | Shared policy, input, collection and application tests |
 | `.github/workflows/deploy.yml` | Manual GitHub deployment with protected environments and encrypted plans |

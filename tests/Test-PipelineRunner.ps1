@@ -84,7 +84,7 @@ try {
             if ($text -match '(?m)^terraform (?:fmt|init|plan|apply) ') { $blocks += [scriptblock]::Create($text) }
         }
     }
-    if ($blocks.Count -ne 3) { throw 'Expected literal Validate, Plan and Apply command blocks.' }
+    if ($blocks.Count -ne 4) { throw 'Expected numbered Init, Validate, Plan and Apply command blocks.' }
     $env:BUILD_SOURCESDIRECTORY=$temp
     $env:BUILD_ARTIFACTSTAGINGDIRECTORY="$temp/ado-staging"
     $env:PIPELINE_WORKSPACE="$temp/ado-workspace"
@@ -93,15 +93,16 @@ try {
     $global:fakeCommands=@()
     & $blocks[0]
     & $blocks[1]
+    & $blocks[2]
     New-Item -ItemType Directory "$temp/ado-workspace" -Force | Out-Null
     Copy-Item "$temp/ado-staging/approved-plan" "$temp/ado-workspace/approved-plan" -Recurse
-    & $blocks[2]
-    foreach ($entry in @{init=3;plan=1;apply=1;fmt=1;validate=1}.GetEnumerator()) {
+    & $blocks[3]
+    foreach ($entry in @{init=4;plan=1;apply=1;fmt=1;validate=1}.GetEnumerator()) {
         if (@($global:fakeCommands | Where-Object { $_ -eq $entry.Key }).Count -ne $entry.Value) { throw "Unexpected inline Terraform command count: $($entry.Key)" }
     }
     if ($global:fakeApplyCount -ne 3) { throw 'Literal YAML apply must apply exactly one saved mock plan.' }
     [IO.File]::WriteAllText("$temp/ado-workspace/approved-plan/platform.tfplan",'tampered-inline-plan')
-    Expect-Failure { & $blocks[2] }
+    Expect-Failure { & $blocks[3] }
     if ($global:fakeApplyCount -ne 3) { throw 'Tampered inline plan reached Terraform apply.' }
     Expect-Failure { & $runner -Service virtual-machines -Environment dev -Operation apply -Phase RecordPlan -ArtifactDirectory "$temp/artifacts" }
     Expect-Failure { & $runner -Service virtual-machines -Environment dev -Operation plan -Phase VerifyPlan -ArtifactDirectory "$temp/artifacts" }

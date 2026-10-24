@@ -6,9 +6,9 @@ class PipelineContracts(unittest.TestCase):
  def test_shared_apply_guard(self):
   p=yaml.safe_load((ROOT/'azure-pipelines.yml').read_text())
   self.assertNotIn('extends',p)
-  self.assertEqual([x['stage'] for x in p['stages']],['Validate','Plan','Apply'])
-  self.assertIn('refs/heads/main',p['stages'][2]['condition'])
-  self.assertEqual(p['stages'][2]['lockBehavior'],'sequential')
+  self.assertEqual([x['stage'] for x in p['stages']],['TerraformInit','TerraformValidate','TerraformPlan','TerraformApply'])
+  self.assertIn('refs/heads/main',p['stages'][3]['condition'])
+  self.assertEqual(p['stages'][3]['lockBehavior'],'sequential')
  def test_every_service_entry_point(self):
   for service in (ROOT/'services').iterdir():
    p=yaml.safe_load((service/'azure-pipelines.yml').read_text())
@@ -40,8 +40,8 @@ class PipelineContracts(unittest.TestCase):
 
  def test_refreshable_oidc_for_plan_and_apply(self):
   p=yaml.safe_load((ROOT/'azure-pipelines.yml').read_text())
-  plan=p['stages'][1]['jobs'][0]['steps']
-  apply=p['stages'][2]['jobs'][0]['strategy']['runOnce']['deploy']['steps']
+  plan=p['stages'][2]['jobs'][0]['steps']
+  apply=p['stages'][3]['jobs'][0]['strategy']['runOnce']['deploy']['steps']
   for steps in (plan,apply):
    task=next(x for x in steps if x.get('task')=='AzureCLI@2')
    self.assertEqual(task['env']['SYSTEM_ACCESSTOKEN'],'$(System.AccessToken)')
@@ -51,12 +51,18 @@ class PipelineContracts(unittest.TestCase):
 
  def test_terraform_commands_are_visible_and_guarded(self):
   p=yaml.safe_load((ROOT/'azure-pipelines.yml').read_text())
-  validate=p['stages'][0]['jobs'][0]['steps']
-  validation=next(x['inputs']['script'] for x in validate if x.get('displayName')=='Terraform fmt, init and validate')
-  for command in ['terraform fmt','terraform init','terraform validate']:
-   self.assertIn(command,validation)
-  plan=next(x for x in p['stages'][1]['jobs'][0]['steps'] if x.get('task')=='AzureCLI@2')['inputs']
-  apply=next(x for x in p['stages'][2]['jobs'][0]['strategy']['runOnce']['deploy']['steps'] if x.get('task')=='AzureCLI@2')['inputs']
+  init=p['stages'][0]['jobs'][0]['steps']
+  initialization=next(x['inputs']['script'] for x in init if x.get('displayName')=='Run terraform fmt and terraform init')
+  self.assertIn('terraform init',initialization)
+  self.assertIn('terraform fmt',initialization)
+  validate=p['stages'][1]['jobs'][0]['steps']
+  validation=next(x['inputs']['script'] for x in validate if x.get('displayName')=='Run terraform validate')
+  self.assertIn('terraform validate',validation)
+  for i,stage in enumerate(p['stages']):
+   self.assertTrue(stage['displayName'].startswith(f'Stage {i+1}: Terraform '))
+   if i:self.assertEqual(stage['dependsOn'],p['stages'][i-1]['stage'])
+  plan=next(x for x in p['stages'][2]['jobs'][0]['steps'] if x.get('task')=='AzureCLI@2')['inputs']
+  apply=next(x for x in p['stages'][3]['jobs'][0]['strategy']['runOnce']['deploy']['steps'] if x.get('task')=='AzureCLI@2')['inputs']
   self.assertEqual(plan['scriptLocation'],'inlineScript')
   self.assertLess(plan['inlineScript'].index('-Phase Prepare'),plan['inlineScript'].index('terraform init'))
   self.assertLess(plan['inlineScript'].index('terraform plan'),plan['inlineScript'].index('-Phase RecordPlan'))
