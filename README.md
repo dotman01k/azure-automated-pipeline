@@ -6,7 +6,7 @@
 
 Eleven Azure compute and storage services in **one repository**, with a folder per service. Each folder has Terraform modules, Dev and Prod roots, public example inputs, provider lock files, mock tests, an Azure DevOps pipeline entry point and a service README. Common pipeline tooling is shared at the repository root.
 
-This collection is source to keep handy and adapt for specific environments. Services are separate deployment units: selecting one does not deploy all eleven. Publishing the repository does not activate Azure infrastructure deployment. GitHub Actions performs source checks; Azure DevOps executes the live Validate → Plan → Apply pipeline after its service connection, agent and protected environment are configured.
+This collection is source to keep handy and adapt for specific environments. Services are separate deployment units: selecting one does not deploy all eleven. Publishing the repository does not activate Azure infrastructure deployment. GitHub Actions performs automatic source checks. Both Azure DevOps and GitHub Actions can execute a manual Validate → Plan → Apply deployment after their identity, runner and approval settings are configured. See [GitHub and dual-platform setup](docs/github-actions.md).
 
 ## Services
 
@@ -34,6 +34,10 @@ These are ten selected compute services plus Azure Storage, not an official popu
 4. Create an Azure DevOps pipeline using the service's `azure-pipelines.yml`, or use the root pipeline and select its `service` parameter.
 5. Run `operation=plan` first. For deployment, start a new `operation=apply` run and approve **that run's** saved plan.
 6. Execute the service-specific application publish/host registration steps where documented. Infrastructure completion alone is not runtime acceptance.
+
+## Choose a deployment platform
+
+Use Azure DevOps with its existing root or service pipeline, or use GitHub Actions → Deploy Azure service. Both share Terraform code, backend keys and policy checks. GitHub deployment stays disabled until `GH_DEPLOY_ENABLED=true` and the protected environments are configured. It encrypts saved plan artifacts for this public repository. Follow [GitHub setup and plan review](docs/github-actions.md); keep one active platform run per service/environment.
 
 ## Shared pipeline behavior
 
@@ -65,13 +69,14 @@ All Terraform data sources live in a separate `data.tf` within the module or env
 | `pipelines/compute.yml` | Shared Azure DevOps stages |
 | `scripts` | Pinned Terraform install, federated auth, input checks, plan policy and provenance |
 | `tests` | Shared policy, input, collection and application tests |
+| `.github/workflows/deploy.yml` | Manual GitHub deployment with protected environments and encrypted plans |
 | `.github/workflows/validate.yml` | Credential-free matrix validation across all eleven services |
 
 New state keys are `compute/<service>/<environment>.tfstate`. The moved Virtual Machines project preserves its existing `windows-vm-dev.tfstate` and `windows-vm-prod.tfstate` keys and `module.windows_vm` resource addresses. See [migration notes](docs/migration.md) before updating an already configured pipeline.
 
 ## Security and identity
 
-Each pipeline uses Azure DevOps workload identity federation through `AzureCLI@2`. It does not reuse GitHub's issuer/subject. Bootstrap RGs, provider registrations, state containers and Azure DevOps permissions remain operator setup tasks. Contributor over the selected service RG plus Blob Data Contributor on its backend are the baseline. Services assigning RBAC also need scoped role assignment authority; see each README.
+Azure DevOps uses workload identity federation through `AzureCLI@2`; GitHub Actions uses its own federated Entra trust. Each runtime refreshes its own assertions, and saved plans are bound to that platform and run. Bootstrap RGs, provider registrations, state containers and Azure DevOps permissions remain operator setup tasks. Contributor over the selected service RG plus Blob Data Contributor on its backend are the baseline. Services assigning RBAC also need scoped role assignment authority; see each README.
 
 Shared storage accounts/containers do not enforce access isolation between state keys. Use distinct containers/accounts and service connections where an environment must not read another state. Administrator passwords are mapped only from the secret variable `TF_SECRET_JSON`; no live password belongs in the JSON tfvars. AVD registration tokens and Service Fabric client private certificates are kept out of Terraform inputs/state by this design.
 

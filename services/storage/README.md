@@ -121,3 +121,7 @@ Four credential-free Terraform mock runs check private/Entra boundaries, recover
 3. [Private endpoints for Azure Storage](https://learn.microsoft.com/azure/storage/common/storage-private-endpoints)
 4. [Blob point in time restore](https://learn.microsoft.com/azure/storage/blobs/point-in-time-restore-overview)
 5. [Blob lifecycle management](https://learn.microsoft.com/azure/storage/blobs/lifecycle-management-overview)
+
+## GitHub Actions alternative
+
+This service can also deploy through the shared GitHub Actions workflow. Follow [GitHub setup](../../docs/github-actions.md), select this folder's service name and use the same backend key. Configure GitHub's separate Plan/Apply environments and approvals before enabling deployment. The Azure DevOps entry point remains available.

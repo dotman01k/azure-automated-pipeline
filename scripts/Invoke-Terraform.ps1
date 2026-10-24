@@ -3,6 +3,7 @@ param(
     [Parameter(Mandatory)][ValidateSet('aks','app-service','batch','container-apps','container-instances','functions','service-fabric','storage','virtual-desktop','virtual-machines','vm-scale-sets')][string]$Service,
     [Parameter(Mandatory)][ValidateSet('dev','prod')][string]$Environment,
     [Parameter(Mandatory)][ValidateSet('validate','plan','apply')][string]$Operation,
+    [ValidateSet('AzureDevOps','GitHubActions')][string]$Platform = 'AzureDevOps',
     [string]$ArtifactDirectory
 )
 $ErrorActionPreference = 'Stop'
@@ -24,20 +25,41 @@ if ($Operation -eq 'validate') {
     Invoke-Checked python @((Join-Path $PSScriptRoot 'validate_inputs.py'),'terraform.tfvars.json')
     return
 }
-foreach ($name in 'servicePrincipalId','tenantId','SYSTEM_ACCESSTOKEN','SYSTEM_OIDCREQUESTURI','ARM_ADO_PIPELINE_SERVICE_CONNECTION_ID','STATE_RESOURCE_GROUP','STATE_STORAGE_ACCOUNT','STATE_CONTAINER','TF_SECRET_JSON') {
+$required = @('STATE_RESOURCE_GROUP','STATE_STORAGE_ACCOUNT','STATE_CONTAINER','TF_SECRET_JSON')
+if ($Platform -eq 'GitHubActions') {
+    $required += @('ARM_CLIENT_ID','ARM_TENANT_ID','ACTIONS_ID_TOKEN_REQUEST_URL','ACTIONS_ID_TOKEN_REQUEST_TOKEN','GITHUB_SHA','GITHUB_RUN_ID','GITHUB_RUN_ATTEMPT','RUNNER_TEMP')
+    $sourceCommit = $env:GITHUB_SHA
+    $runId = $env:GITHUB_RUN_ID
+    $attempt = $env:GITHUB_RUN_ATTEMPT
+    $temporaryDirectory = $env:RUNNER_TEMP
+} else {
+    $required += @('servicePrincipalId','tenantId','SYSTEM_ACCESSTOKEN','SYSTEM_OIDCREQUESTURI','ARM_ADO_PIPELINE_SERVICE_CONNECTION_ID','BUILD_SOURCEVERSION','BUILD_BUILDID','AGENT_TEMPDIRECTORY')
+    $sourceCommit = $env:BUILD_SOURCEVERSION
+    $runId = $env:BUILD_BUILDID
+    $attempt = '1'
+    $temporaryDirectory = $env:AGENT_TEMPDIRECTORY
+}
+foreach ($name in $required) {
     $value = [Environment]::GetEnvironmentVariable($name)
     if ([string]::IsNullOrWhiteSpace($value) -or $value.StartsWith('$(')) { throw "Missing pipeline setting: $name" }
 }
+if ([string]::IsNullOrWhiteSpace($ArtifactDirectory)) { throw 'ArtifactDirectory is required for plan/apply.' }
 $env:ARM_USE_OIDC = 'true'
 $env:ARM_USE_AZUREAD = 'true'
-$env:ARM_CLIENT_ID = $env:servicePrincipalId
-$env:ARM_TENANT_ID = $env:tenantId
-# Let the pinned provider AND backend request fresh job-scoped assertions.
-# A one-time AzureCLI idToken can expire during long Service Fabric operations.
+# Clear a static assertion so the pinned backend and provider can refresh it.
 Remove-Item Env:ARM_OIDC_TOKEN -ErrorAction SilentlyContinue
 Remove-Item Env:ARM_OIDC_TOKEN_FILE_PATH -ErrorAction SilentlyContinue
-$env:ARM_OIDC_REQUEST_TOKEN = $env:SYSTEM_ACCESSTOKEN
-$env:ARM_OIDC_REQUEST_URL = $env:SYSTEM_OIDCREQUESTURI
+if ($Platform -eq 'GitHubActions') {
+    Remove-Item Env:ARM_ADO_PIPELINE_SERVICE_CONNECTION_ID -ErrorAction SilentlyContinue
+    Remove-Item Env:ARM_OIDC_AZURE_SERVICE_CONNECTION_ID -ErrorAction SilentlyContinue
+    $env:ARM_OIDC_REQUEST_TOKEN = $env:ACTIONS_ID_TOKEN_REQUEST_TOKEN
+    $env:ARM_OIDC_REQUEST_URL = $env:ACTIONS_ID_TOKEN_REQUEST_URL
+} else {
+    $env:ARM_CLIENT_ID = $env:servicePrincipalId
+    $env:ARM_TENANT_ID = $env:tenantId
+    $env:ARM_OIDC_REQUEST_TOKEN = $env:SYSTEM_ACCESSTOKEN
+    $env:ARM_OIDC_REQUEST_URL = $env:SYSTEM_OIDCREQUESTURI
+}
 $secrets = ConvertFrom-Json -InputObject $env:TF_SECRET_JSON -AsHashtable
 if ($secrets -isnot [System.Collections.IDictionary]) { throw 'TF_SECRET_JSON must be a JSON object.' }
 $expectedSecrets = @($project.secret_variables)
@@ -73,22 +95,22 @@ if ($Operation -eq 'plan') {
     if ($LASTEXITCODE) { throw 'Cannot render review plan.' }
     $text | Set-Content (Join-Path $ArtifactDirectory 'plan.txt') -Encoding utf8
     @{
-        service=$Service;environment=$Environment;commit=$env:BUILD_SOURCEVERSION;build=$env:BUILD_BUILDID
+        service=$Service;environment=$Environment;commit=$sourceCommit;run=$runId;attempt=$attempt;platform=$Platform
         plan_hash=(Get-FileHash $planPath -Algorithm SHA256).Hash
         terraform='1.13.0';subscription=$env:ARM_SUBSCRIPTION_ID
         account=$env:STATE_STORAGE_ACCOUNT;container=$env:STATE_CONTAINER;key=$stateKey
     } | ConvertTo-Json | Set-Content $manifestPath -Encoding utf8
 } else {
     $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
-    if ($manifest.service -ne $Service -or $manifest.environment -ne $Environment -or $manifest.commit -ne $env:BUILD_SOURCEVERSION -or
-        $manifest.build -ne $env:BUILD_BUILDID -or $manifest.terraform -ne '1.13.0' -or
+    if ($manifest.service -ne $Service -or $manifest.environment -ne $Environment -or $manifest.commit -ne $sourceCommit -or
+        $manifest.platform -ne $Platform -or $manifest.run -ne $runId -or $manifest.attempt -ne $attempt -or $manifest.terraform -ne '1.13.0' -or
         $manifest.subscription -ne $env:ARM_SUBSCRIPTION_ID -or $manifest.account -ne $env:STATE_STORAGE_ACCOUNT -or
         $manifest.container -ne $env:STATE_CONTAINER -or $manifest.key -ne $stateKey -or
         $manifest.plan_hash -ne (Get-FileHash $planPath -Algorithm SHA256).Hash) { throw 'Saved plan provenance/backend mismatch.' }
     # Gate the downloaded binary again; apply exactly this plan, without replanning.
     $json = & terraform show -json $planPath
     if ($LASTEXITCODE) { throw 'Cannot decode downloaded saved plan.' }
-    $temp = Join-Path $env:AGENT_TEMPDIRECTORY ([guid]::NewGuid().ToString()+'.json')
+    $temp = Join-Path $temporaryDirectory ([guid]::NewGuid().ToString()+'.json')
     $json | Set-Content $temp -Encoding utf8
     try { Invoke-Checked python @((Join-Path $PSScriptRoot 'plan_policy.py'),$temp) }
     finally { Remove-Item $temp -Force -ErrorAction SilentlyContinue }

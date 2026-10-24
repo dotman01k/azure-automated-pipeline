@@ -68,3 +68,7 @@ The module has credential-free Terraform mock tests, both roots receive provider
 
 1. https://registry.terraform.io/providers/hashicorp/azurerm/4.68.0/docs
 2. https://learn.microsoft.com/azure/
+
+## GitHub Actions alternative
+
+This service can also deploy through the shared GitHub Actions workflow. Follow [GitHub setup](../../docs/github-actions.md), select this folder's service name and use the same backend key. Configure GitHub's separate Plan/Apply environments and approvals before enabling deployment. The Azure DevOps entry point remains available.

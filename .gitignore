@@ -8,3 +8,9 @@
 .plan/
 __pycache__/
 *.pyc
+
+*.enc
+approved-plan/
+encrypted-plan/
+plan.txt
+manifest.json

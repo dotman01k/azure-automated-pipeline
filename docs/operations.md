@@ -35,3 +35,7 @@ No normal destroy workflow is exposed. Use a separately reviewed maintenance bra
 Remove workloads/registrations before their infrastructure. Delete guest/cluster compute and attached NIC/disks before subnets/VNets, and private DNS links/endpoints before parent networks. Service Fabric/AKS/Container Apps may have managed resource groups: inspect them after service deletion rather than deleting guessed shared resources. Public IP, NAT, Bastion, load balancer, logs, storage and registry resources can remain billable independently of compute.
 
 Bootstrap RGs, backend storage, role assignments, service connections, variable groups, approval environments, agent registrations and local credential caches need separate cleanup. Retain shared backend accounts until every dependent state is reconciled. Never delete state to make drift disappear.
+
+## Using both pipeline platforms
+
+[GitHub Actions setup](github-actions.md) documents separate federated trust, protected approval environments, encrypted plan review and shared backend ownership. Start a complete new run when switching platforms; never reuse a binary plan from another platform or run. Keep one active deployment per service/environment.

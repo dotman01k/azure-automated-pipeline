@@ -1,0 +1,179 @@
+name: Deploy Azure service
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: Service folder to deploy
+        required: true
+        type: choice
+        default: virtual-machines
+        options:
+        - aks
+        - app-service
+        - batch
+        - container-apps
+        - container-instances
+        - functions
+        - service-fabric
+        - storage
+        - virtual-desktop
+        - virtual-machines
+        - vm-scale-sets
+      environment:
+        description: Target environment
+        required: true
+        type: choice
+        default: dev
+        options: [dev, prod]
+      operation:
+        description: Plan only or plan followed by approved apply
+        required: true
+        type: choice
+        default: plan
+        options: [plan, apply]
+permissions:
+  contents: read
+concurrency:
+  group: azure-deploy-${{ inputs.service }}-${{ inputs.environment }}
+  cancel-in-progress: false
+jobs:
+  validate:
+    if: github.ref == 'refs/heads/main' && vars.GH_DEPLOY_ENABLED == 'true'
+    runs-on: ${{ fromJSON(vars.GH_RUNNER_LABELS || '["ubuntu-24.04"]') }}
+    timeout-minutes: 20
+    env:
+      SERVICE: ${{ inputs.service }}
+      TARGET_ENVIRONMENT: ${{ inputs.environment }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      with:
+        ref: ${{ github.sha }}
+        persist-credentials: false
+    - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd
+      with:
+        terraform_version: 1.13.0
+        terraform_wrapper: false
+    - run: |
+        python -m pip install -r requirements-validation.txt
+        if ($LASTEXITCODE) { throw 'Dependency installation failed.' }
+        python -m unittest discover -s tests -v
+        if ($LASTEXITCODE) { throw 'Shared tests failed.' }
+        ./tests/Test-Syntax.ps1
+        pwsh -NoProfile -File ./tests/Test-PlanArtifact.ps1
+        if ($LASTEXITCODE) { throw 'Artifact tests failed.' }
+        pwsh -NoProfile -File ./tests/Test-PipelineRunner.ps1
+        if ($LASTEXITCODE) { throw 'Pipeline tests failed.' }
+        ./scripts/Invoke-Terraform.ps1 -Service $env:SERVICE -Environment $env:TARGET_ENVIRONMENT -Operation validate -Platform GitHubActions
+  plan:
+    needs: validate
+    runs-on: ${{ fromJSON(vars.GH_RUNNER_LABELS || '["ubuntu-24.04"]') }}
+    timeout-minutes: 180
+    environment:
+      name: compute-${{ inputs.service }}-${{ inputs.environment }}-plan
+    permissions:
+      contents: read
+      id-token: write
+      actions: read
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      SERVICE: ${{ inputs.service }}
+      TARGET_ENVIRONMENT: ${{ inputs.environment }}
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      STATE_RESOURCE_GROUP: ${{ vars.STATE_RESOURCE_GROUP }}
+      STATE_STORAGE_ACCOUNT: ${{ vars.STATE_STORAGE_ACCOUNT }}
+      STATE_CONTAINER: ${{ vars.STATE_CONTAINER }}
+      TF_SECRET_JSON: ${{ secrets.TF_SECRET_JSON || '{}' }}
+    steps:
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      with:
+        ref: ${{ github.sha }}
+        persist-credentials: false
+    - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd
+      with:
+        terraform_version: 1.13.0
+        terraform_wrapper: false
+    - name: Show public federated identity claims
+      run: ./scripts/Show-OidcSubject.ps1
+    - uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6
+      with:
+        client-id: ${{ vars.AZURE_CLIENT_ID }}
+        tenant-id: ${{ vars.AZURE_TENANT_ID }}
+        subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+    - name: plan selected service
+      run: ./scripts/Invoke-Terraform.ps1 -Service $env:SERVICE -Environment $env:TARGET_ENVIRONMENT -Operation plan -Platform GitHubActions -ArtifactDirectory "$env:RUNNER_TEMP/approved-plan"
+    - name: Encrypt saved plan and private review files
+      env:
+        PLAN_ARTIFACT_KEY: ${{ secrets.PLAN_ARTIFACT_KEY }}
+      run: ./scripts/Protect-PlanArtifact.ps1 -Mode encrypt -Directory "$env:RUNNER_TEMP/approved-plan" -ArchivePath "$env:RUNNER_TEMP/encrypted-plan/plan.enc"
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: approved-plan-${{ github.run_id }}-${{ github.run_attempt }}
+        path: ${{ runner.temp }}/encrypted-plan/plan.enc
+        if-no-files-found: error
+        retention-days: 1
+    - name: Review instructions
+      run: |
+        'Download and decrypt this run''s encrypted artifact on a trusted machine. Review plan.txt before approving Apply. Never paste the encryption key or decrypted plan into an issue or workflow log.' >> $env:GITHUB_STEP_SUMMARY
+    - name: Remove temporary plan files
+      if: always()
+      run: |
+        Remove-Item -LiteralPath "$env:RUNNER_TEMP/approved-plan","$env:RUNNER_TEMP/encrypted-plan" -Recurse -Force -ErrorAction SilentlyContinue
+  apply:
+    needs: plan
+    if: inputs.operation == 'apply' && github.ref == 'refs/heads/main'
+    runs-on: ${{ fromJSON(vars.GH_RUNNER_LABELS || '["ubuntu-24.04"]') }}
+    timeout-minutes: 180
+    environment:
+      name: compute-${{ inputs.service }}-${{ inputs.environment }}-apply
+    permissions:
+      contents: read
+      id-token: write
+      actions: read
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      SERVICE: ${{ inputs.service }}
+      TARGET_ENVIRONMENT: ${{ inputs.environment }}
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      STATE_RESOURCE_GROUP: ${{ vars.STATE_RESOURCE_GROUP }}
+      STATE_STORAGE_ACCOUNT: ${{ vars.STATE_STORAGE_ACCOUNT }}
+      STATE_CONTAINER: ${{ vars.STATE_CONTAINER }}
+      TF_SECRET_JSON: ${{ secrets.TF_SECRET_JSON || '{}' }}
+    steps:
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      with:
+        ref: ${{ github.sha }}
+        persist-credentials: false
+    - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd
+      with:
+        terraform_version: 1.13.0
+        terraform_wrapper: false
+    - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      with:
+        name: approved-plan-${{ github.run_id }}-${{ github.run_attempt }}
+        path: ${{ runner.temp }}/encrypted-plan
+    - name: Authenticate and decrypt the saved plan
+      env:
+        PLAN_ARTIFACT_KEY: ${{ secrets.PLAN_ARTIFACT_KEY }}
+      run: ./scripts/Protect-PlanArtifact.ps1 -Mode decrypt -Directory "$env:RUNNER_TEMP/approved-plan" -ArchivePath "$env:RUNNER_TEMP/encrypted-plan/plan.enc"
+    - name: Show public federated identity claims
+      run: ./scripts/Show-OidcSubject.ps1
+    - uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6
+      with:
+        client-id: ${{ vars.AZURE_CLIENT_ID }}
+        tenant-id: ${{ vars.AZURE_TENANT_ID }}
+        subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+    - name: apply selected service
+      run: ./scripts/Invoke-Terraform.ps1 -Service $env:SERVICE -Environment $env:TARGET_ENVIRONMENT -Operation apply -Platform GitHubActions -ArtifactDirectory "$env:RUNNER_TEMP/approved-plan"
+    - name: Remove temporary plan files
+      if: always()
+      run: |
+        Remove-Item -LiteralPath "$env:RUNNER_TEMP/approved-plan","$env:RUNNER_TEMP/encrypted-plan" -Recurse -Force -ErrorAction SilentlyContinue
