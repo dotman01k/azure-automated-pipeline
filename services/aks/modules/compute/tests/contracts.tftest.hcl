@@ -75,3 +75,16 @@ override_data {
   target = data.azurerm_client_config.current
   values = { tenant_id = "00000000-0000-0000-0000-000000000002" }
 }
+
+# Azure returns this computed identity after cluster creation. Supply its shape
+# explicitly for offline mock plans used by the AcrPull role assignment.
+override_resource {
+  target = azurerm_kubernetes_cluster.main
+  values = {
+    kubelet_identity = [{
+      client_id                 = "00000000-0000-0000-0000-000000000004"
+      object_id                 = "00000000-0000-0000-0000-000000000005"
+      user_assigned_identity_id = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-compute-tests/providers/Microsoft.ManagedIdentity/userAssignedIdentities/kubelet"
+    }]
+  }
+}
