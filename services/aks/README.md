@@ -43,6 +43,8 @@ The backend additionally needs Microsoft.Storage registered. This module creates
 
 Install kubectl matching the actual cluster version and kubelogin on an allowed operator/agent. An Entra admin group member can run `pwsh -File services/aks/scripts/Deploy-App.ps1 -ResourceGroup <rg> -ClusterName <cluster_name>`. Verify namespace compute-demo pods and `kubectl -n compute-demo port-forward service/demo 8080:80`, then curl on the same machine. This sample pulls a public demo image, not the newly created ACR; configure build/push and registry permissions before using a private application. Two replicas on one app node do not provide host redundancy.
 
+The cluster uses separate control plane and kubelet user assigned identities. The control plane has Network Contributor on its VNet and Managed Identity Operator only on the kubelet identity. The kubelet has AcrPull only on this registry. Its identity exists before cluster creation, so registry authorization does not depend on reading an identity that Azure generates during provisioning.
+
 ## Security boundary and limitations
 
 This is a smaller reusable infrastructure reference, not a duplicate of the separate fully exercised azure-aks-platform project. It has a public allowlisted API, two system nodes and one app node. No private Key Vault, CI application identity or ingress is created. The sample manifest is deployed separately by an authorized Entra operator.

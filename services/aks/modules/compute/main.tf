@@ -62,6 +62,19 @@ resource "azurerm_user_assigned_identity" "main" {
 
 }
 
+resource "azurerm_user_assigned_identity" "kubelet" {
+  name                = "${var.name}-kubelet"
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  tags                = var.tags
+}
+
+resource "azurerm_role_assignment" "kubelet_operator" {
+  scope                = azurerm_user_assigned_identity.kubelet.id
+  role_definition_name = "Managed Identity Operator"
+  principal_id         = azurerm_user_assigned_identity.main.principal_id
+}
+
 resource "azurerm_role_assignment" "network" {
 
   scope                = azurerm_virtual_network.main.id
@@ -95,6 +108,12 @@ resource "azurerm_kubernetes_cluster" "main" {
   identity {
     type         = "UserAssigned"
     identity_ids = [azurerm_user_assigned_identity.main.id]
+  }
+
+  kubelet_identity {
+    client_id                 = azurerm_user_assigned_identity.kubelet.client_id
+    object_id                 = azurerm_user_assigned_identity.kubelet.principal_id
+    user_assigned_identity_id = azurerm_user_assigned_identity.kubelet.id
   }
 
   azure_active_directory_role_based_access_control {
@@ -138,7 +157,7 @@ resource "azurerm_kubernetes_cluster" "main" {
   }
 
   tags       = var.tags
-  depends_on = [azurerm_role_assignment.network, azurerm_subnet_nat_gateway_association.main]
+  depends_on = [azurerm_role_assignment.network, azurerm_role_assignment.kubelet_operator, azurerm_subnet_nat_gateway_association.main]
 
 }
 
@@ -162,7 +181,7 @@ resource "azurerm_role_assignment" "pull" {
 
   scope                = azurerm_container_registry.main.id
   role_definition_name = "AcrPull"
-  principal_id         = azurerm_kubernetes_cluster.main.kubelet_identity[0].object_id
+  principal_id         = azurerm_user_assigned_identity.kubelet.principal_id
 
 }
 
